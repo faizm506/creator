@@ -1,0 +1,15 @@
+{% extends "core/base.html" %}
+{% block title %}Join · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap auth">
+  <h1>Create your account</h1>
+  <p class="lead-s">Free for creators and brands.</p>
+  <form method="post" class="group">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    {% for field in form %}{% include "core/_field.html" %}{% endfor %}
+    <button class="btn btn-primary btn-block">Create account</button>
+  </form>
+  <p class="fine">Have an account? <a href="{% url 'login' %}">Sign in</a></p>
+</section>
+{% endblock %}

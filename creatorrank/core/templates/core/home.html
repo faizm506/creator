@@ -1,0 +1,113 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% block content %}
+<section class="hero wrap">
+  <div class="hero-copy">
+    <h1>Where Ahmedabad's creators meet its brands.</h1>
+    <p class="lead">Build a profile, climb a public leaderboard and apply to real campaigns from the city. Free to join.</p>
+    <form class="hero-search" action="{% url 'leaderboard' %}" method="get" role="search">
+      <input type="search" name="q" placeholder="Search a creator or handle" aria-label="Search creators">
+      <input type="hidden" name="city" value="Ahmedabad">
+      <button class="btn btn-primary">Search</button>
+    </form>
+    <div class="chips" aria-label="Browse by niche">
+      {% for k, label in niches|slice:":6" %}<a class="chip" href="{% url 'leaderboard' %}?city=Ahmedabad&amp;niche={{ k }}">{{ label }}</a>{% endfor %}
+    </div>
+    <div class="cta">
+      <a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Create your profile</a>
+      <a class="btn btn-ghost btn-lg" href="{% url 'leaderboard' %}">See the leaderboard</a>
+    </div>
+  </div>
+  {% include "core/_scene.html" %}
+</section>
+
+<section class="wrap statband" aria-label="Network at a glance">
+  <div><b data-count="{{ stats.creators }}">{{ stats.creators }}</b><span>Creators</span></div>
+  <div><b data-count="{{ stats.brands }}">{{ stats.brands }}</b><span>Brands</span></div>
+  <div><b data-count="{{ stats.campaigns }}">{{ stats.campaigns }}</b><span>Open campaigns</span></div>
+  <div><b data-count="{{ stats.reach }}" data-format="compact">{{ stats.reach|compact }}</b><span>Combined followers</span></div>
+</section>
+
+
+{% if featured %}
+<section class="wrap shelf">
+  <div class="sec-head"><h2>Featured creators</h2><a class="link" href="{% url 'how' %}">How Featured works</a></div>
+  <div class="rows rows-featured" data-rows>{% for p in featured %}{% include "core/_row.html" %}{% endfor %}</div>
+  <p class="fine">Featured spots rotate fairly, so every boosted creator gets equal time on this shelf.</p>
+</section>
+{% endif %}
+
+<section class="wrap champs-sec">
+  <h2>Who's number one in each niche?</h2>
+  <p class="lead-s">Every niche has a crown. Take it by climbing the leaderboard.</p>
+  <div class="champs">
+    {% for k, label, p in champions %}
+    {% if p %}
+    <a class="champ" href="{% url 'leaderboard' %}?niche={{ k }}">
+      <span class="champ-niche">{{ label }}</span>
+      <span class="avatar {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+      <strong>{{ p.display_name }}</strong>
+      <span class="muted">@{{ p.handle }}</span>
+      <span class="score">{{ p.rank_score }}</span>
+      <svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 10H5z"/></svg>
+    </a>
+    {% else %}
+    <a class="champ open" href="{% url 'signup' %}">
+      <span class="champ-niche">{{ label }}</span>
+      <span class="avatar-ghost" aria-hidden="true">?</span>
+      <strong>Unclaimed</strong>
+      <span class="muted">Be the first {{ label|lower }} creator</span>
+    </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+<section class="wrap steps-sec">
+  <h2>From profile to paid campaign.</h2>
+  <ol class="steps">
+    <li><span class="num">1</span><h3>Build your profile</h3><p>Add your niche, city, numbers and rates. A complete profile earns up to 25 points.</p></li>
+    <li><span class="num">2</span><h3>Climb the leaderboard</h3><p>Audience, engagement and completeness decide your rank. The formula is public.</p></li>
+    <li><span class="num">3</span><h3>Get booked</h3><p>Apply to campaigns from Ahmedabad brands, or get found through the Featured spot.</p></li>
+  </ol>
+</section>
+
+<section class="wrap split">
+  <div>
+    <h2>A ranking you can read.</h2>
+    <p class="lead-s">Your score is out of 100. Nobody can buy a higher score.</p>
+  </div>
+  <ul class="formula">
+    <li><b>35</b><span>Audience size</span></li>
+    <li><b>25</b><span>Engagement rate</span></li>
+    <li><b>25</b><span>Profile completeness</span></li>
+    <li><b>10</b><span>Reel showcase (3 reels)</span></li>
+    <li><b>5</b><span>Verified by us</span></li>
+  </ul>
+</section>
+
+{% if top %}
+<section class="wrap">
+  <div class="sec-head"><h2>Top creators right now</h2><a class="link" href="{% url 'leaderboard' %}">View all</a></div>
+  <div class="rows" data-rows>
+    {% for p in top %}{% include "core/_row.html" with rank=forloop.counter %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+
+{% if rising %}
+<section class="wrap shelf">
+  <div class="sec-head"><h2>Rising stars</h2><span class="muted">Joined in the last 30 days</span></div>
+  <div class="rows" data-rows>{% for p in rising %}{% include "core/_row.html" %}{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="wrap boost-band">
+  <div>
+    <h2>Want more eyes on you?</h2>
+    <p class="lead-s">Boost puts your profile in the Featured spot for a week, a month or three. Pay by UPI and it goes live once we confirm.</p>
+  </div>
+  <a class="btn btn-primary btn-lg" href="{% url 'boost' %}">Boost my profile</a>
+</section>
+{% endblock %}

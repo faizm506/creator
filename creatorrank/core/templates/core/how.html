@@ -1,0 +1,27 @@
+{% extends "core/base.html" %}
+{% block title %}How ranking works · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap narrow how">
+  <h1>How ranking and Featured work.</h1>
+  <p class="lead-s">Two separate things decide what people see. Money touches only one of them.</p>
+
+  <div class="panel">
+    <h2>1. The leaderboard is earned</h2>
+    <p>Position is decided by score, out of 100: audience size, engagement, a complete profile, a reel showcase and the verified tick. Nobody can pay for score.</p>
+    <p>If two creators have the same score, the one with more followers goes first. If that is also equal, the one who joined earlier goes first. The order is always the same for everyone.</p>
+  </div>
+
+  <div class="panel">
+    <h2>2. Featured is rented, fairly shared</h2>
+    <p>Boosting puts a creator on the Featured shelf above the leaderboard, in their niche. Their rank below does not change.</p>
+    <ul class="plain">
+      <li><b>Limited spots.</b> At most {{ cap }} creators can be Featured at once in each niche. When a niche is full, new boosts wait until a spot frees up, and nobody is charged for a full niche.</li>
+      <li><b>Equal time.</b> The shelf shows only a few creators at a time. It always picks the ones shown least so far, so 10 boosted creators get the same exposure, not just the top scorer.</li>
+      <li><b>Real profiles only.</b> To appear, a creator needs a bio, a niche and a follower count. Empty profiles are never shown.</li>
+      <li><b>You can see the result.</b> Your dashboard shows how many times your boost was shown, how many people viewed your page and how many visited your Instagram.</li>
+    </ul>
+  </div>
+
+  <div class="cta"><a class="btn btn-primary btn-lg" href="{% url 'boost' %}">Boost my profile</a><a class="btn btn-ghost btn-lg" href="{% url 'leaderboard' %}">See the leaderboard</a></div>
+</section>
+{% endblock %}
