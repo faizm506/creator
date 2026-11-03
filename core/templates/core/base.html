@@ -1,0 +1,66 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>{% block title %}{{ SITE_NAME }} · Ahmedabad creator network{% endblock %}</title>
+  <meta name="description" content="Ahmedabad's creator and brand network. Get ranked, get found, get booked.">
+  <link rel="stylesheet" href="{% static 'core/css/app.css' %}">
+  <script src="{% static 'core/js/app.js' %}" defer></script>
+</head>
+<body>
+{% with u=request.resolver_match.url_name %}
+<div class="util"><div class="util-in">
+  <span><i class="dot"></i> Ahmedabad, Gujarat · Creator &amp; brand network</span>
+  <span class="util-links"><a href="{% url 'boost' %}">Boost pricing</a><a href="{% url 'campaigns' %}">Open campaigns</a></span>
+</div></div>
+
+<header class="nav">
+  <div class="nav-in">
+    <a class="logo" href="{% url 'home' %}"><span class="logo-mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
+    <nav class="links" aria-label="Main">
+      <a href="{% url 'leaderboard' %}"{% if u == 'leaderboard' %} class="cur"{% endif %}>Leaderboard</a>
+      <a href="{% url 'campaigns' %}"{% if u == 'campaigns' or u == 'campaign' %} class="cur"{% endif %}>Campaigns</a>
+      <a href="{% url 'boost' %}"{% if u == 'boost' %} class="cur"{% endif %}>Boost</a>
+    </nav>
+    <div class="nav-end">
+      {% if user.is_authenticated %}
+        <a class="btn btn-ghost" href="{% url 'settings' %}">@{{ user.profile.handle }}</a>
+        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn btn-quiet">Sign out</button></form>
+      {% else %}
+        <a class="btn btn-quiet" href="{% url 'login' %}">Sign in</a>
+        <a class="btn btn-primary" href="{% url 'signup' %}">Join free</a>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+{% if messages %}
+<div class="toasts" role="status" aria-live="polite">
+  {% for m in messages %}<div class="toast toast-{{ m.level_tag }}">{{ m }}</div>{% endfor %}
+</div>
+{% endif %}
+
+<main>{% block content %}{% endblock %}</main>
+
+<footer class="foot">
+  <div class="wrap foot-grid">
+    <div><a class="logo" href="{% url 'home' %}"><span class="logo-mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
+      <p>The leaderboard where Ahmedabad's Instagram creators and brands find each other.</p></div>
+    <div><h4>Explore</h4><a href="{% url 'leaderboard' %}">Leaderboard</a><a href="{% url 'campaigns' %}">Campaigns</a><a href="{% url 'how' %}">How ranking works</a></div>
+    <div><h4>Creators</h4><a href="{% url 'signup' %}">Create a profile</a><a href="{% url 'boost' %}">Boost your profile</a></div>
+    <div><h4>Trust</h4><span>Public ranking formula</span><span>Manual payment checks</span>{% if SUPPORT_WHATSAPP %}<a href="https://wa.me/{{ SUPPORT_WHATSAPP }}" rel="noopener noreferrer">WhatsApp support</a>{% endif %}</div>
+  </div>
+  <div class="wrap foot-end">Rankings use self-reported numbers. Boosting buys visibility, never score.</div>
+</footer>
+
+<nav class="tabbar" aria-label="Quick navigation">
+  <a href="{% url 'home' %}"{% if u == 'home' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>Home</a>
+  <a href="{% url 'leaderboard' %}"{% if u == 'leaderboard' or u == 'creator' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><path d="M5 20V12M12 20V4M19 20v-9"/></svg>Ranks</a>
+  <a href="{% url 'campaigns' %}"{% if u == 'campaigns' or u == 'campaign' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Campaigns</a>
+  {% if user.is_authenticated %}<a href="{% url 'settings' %}"{% if u == 'settings' or u == 'boost' %} class="on"{% endif %}>{% else %}<a href="{% url 'login' %}"{% if u == 'login' or u == 'signup' %} class="on"{% endif %}>{% endif %}<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>{% if user.is_authenticated %}Me{% else %}Sign in{% endif %}</a>
+</nav>
+{% endwith %}
+</body>
+</html>

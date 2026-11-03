@@ -1,0 +1,46 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% block title %}Leaderboard · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap page-head">
+  <h1>Leaderboard</h1>
+  <p class="lead-s">Creators ranked by score. Filter by niche or city to find the right fit.</p>
+  <form class="filters" method="get">
+    <input type="search" name="q" value="{{ q }}" placeholder="Search name or handle" aria-label="Search">
+    <select name="niche" aria-label="Niche">
+      <option value="">All niches</option>
+      {% for k, label in niches %}<option value="{{ k }}"{% if k == niche %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <input type="text" name="city" value="{{ city }}" placeholder="City" aria-label="City">
+    <button class="btn btn-primary">Apply</button>
+  </form>
+  <div class="chips" role="group" aria-label="Quick niche filter">
+    <a class="chip{% if not niche %} on{% endif %}" href="?city={{ city|urlencode }}">All</a>
+    {% for k, label in niches %}<a class="chip{% if k == niche %} on{% endif %}" href="?niche={{ k }}&city={{ city|urlencode }}">{{ label }}</a>{% endfor %}
+  </div>
+  <input class="live" type="search" data-live placeholder="Type to filter this page instantly" aria-label="Filter results on this page">
+</section>
+
+<section class="wrap">
+  {% if featured %}
+  <h2 class="mini">Featured</h2>
+  <div class="rows rows-featured">
+    {% for p in featured %}{% include "core/_row.html" %}{% endfor %}
+  </div>
+  <h2 class="mini">Ranked</h2>
+  {% endif %}
+  <div class="rows" data-rows>
+    {% for p in page %}{% include "core/_row.html" with rank=forloop.counter|add:page.start_index|add:"-1" %}
+    {% empty %}
+      <div class="empty"><h3>No creators match yet.</h3><p>Clear a filter, or <a href="{% url 'signup' %}">be the first to join</a>.</p></div>
+    {% endfor %}
+  </div>
+  {% if page.paginator.num_pages > 1 %}
+  <nav class="pager" aria-label="Pages">
+    {% if page.has_previous %}<a class="btn btn-ghost" href="?{{ qs }}&page={{ page.previous_page_number }}">Previous</a>{% endif %}
+    <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="btn btn-ghost" href="?{{ qs }}&page={{ page.next_page_number }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}
