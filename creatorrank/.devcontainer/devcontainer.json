@@ -1,8 +1,0 @@
-{
-  "name": "CreatorRank (Django)",
-  "image": "mcr.microsoft.com/devcontainers/python:3.12",
-  "postCreateCommand": "pip install -r requirements.txt && cp -n .env.example .env && python manage.py makemigrations core && python manage.py migrate && python manage.py seed_demo",
-  "forwardPorts": [8000],
-  "portsAttributes": { "8000": { "label": "CreatorRank", "onAutoForward": "openPreview" } },
-  "customizations": { "vscode": { "extensions": ["ms-python.python", "batisteo.vscode-django"] } }
-}

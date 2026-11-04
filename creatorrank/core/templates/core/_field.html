@@ -1,8 +1,0 @@
-<div class="field{% if field.errors %} has-error{% endif %}">
-  <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-  {% if field.field.widget.input_type == "radio" %}<div class="segmented">{{ field }}</div>
-  {% elif field.field.widget.input_type == "checkbox" %}<div class="switch-row">{{ field }}</div>
-  {% else %}{{ field }}{% endif %}
-  {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
-  {% for e in field.errors %}<small class="err">{{ e }}</small>{% endfor %}
-</div>
