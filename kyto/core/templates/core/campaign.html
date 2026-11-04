@@ -1,0 +1,88 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% block title %}{{ c.title }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+{% with b=c.brand.profile %}
+<div class="cover cover-s {{ b.avatar_class }}" aria-hidden="true"></div>
+<section class="wrap cdet">
+  <div class="cdet-main">
+    <header class="cdet-head">
+      <span class="avatar avatar-lg {{ b.avatar_class }}" aria-hidden="true">{{ b.initial }}</span>
+      <div>
+        <p class="muted"><a href="{% url 'campaigns' %}">Campaigns</a> › {{ b.display_name }}</p>
+        <h1>{{ c.title }}</h1>
+        <p class="muted">By <a href="{% url 'creator' b.handle %}">{{ b.display_name }}</a> · posted {{ c.created|timesince }} ago</p>
+      </div>
+    </header>
+    <div class="tags tags-l">
+      {% if c.niche %}<span class="tag">{{ c.get_niche_display }}</span>{% endif %}
+      {% if c.city %}<span class="tag">{{ c.city }}</span>{% endif %}
+      <span class="tag tag-{% if c.is_open %}open{% else %}closed{% endif %}">{% if c.is_open %}Open{% else %}Closed{% endif %}</span>
+    </div>
+
+    <div class="panel"><h2>About this campaign</h2><p class="prose">{{ c.description|linebreaksbr }}</p></div>
+    <div class="panel"><h2>What you'll make</h2>
+      <div class="tags tags-l">{% for d in c.deliverables|chips %}<span class="tag tag-big">{{ d }}</span>{% empty %}<span class="muted">{{ c.deliverables }}</span>{% endfor %}</div>
+    </div>
+
+    {% if is_owner %}
+    <div class="panel" id="applicants">
+      <div class="panel-head"><h2>Applicants ({{ applications|length }})</h2>
+        {% if c.is_open %}<form method="post" action="{% url 'campaign_close' c.pk %}" data-confirm="Close this campaign? Creators won't be able to apply.">{% csrf_token %}<button class="btn btn-quiet">Close campaign</button></form>{% endif %}</div>
+      <div class="applicants">
+        {% for a in applications %}
+        {% with p=a.creator.profile %}
+        <article class="acard">
+          <div class="acard-top">
+            <span class="avatar {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+            <div class="acard-who"><b>{{ p.display_name }}{% if p.verified %}<svg class="tick" viewBox="0 0 20 20" aria-label="Verified"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.3l2.6 2.6 5.4-5.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endif %}</b>
+              <span class="muted">@{{ p.handle }} · {{ p.followers|compact }} followers · {{ p.engagement }}% engagement</span></div>
+            <span class="score">{{ p.rank_score }}</span>
+          </div>
+          <p class="quote">“{{ a.message }}”</p>
+          <div class="acard-act">
+            <a class="btn btn-primary" href="{% url 'offer_new' p.handle %}?campaign={{ c.pk }}">Send offer</a>
+            <a class="btn btn-ghost" href="{% url 'creator' p.handle %}">View profile</a>
+          </div>
+        </article>
+        {% endwith %}
+        {% empty %}<div class="empty"><p>No applications yet. Share this page to get creators applying.</p><button type="button" class="btn btn-ghost" data-copy>Copy link</button></div>{% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if more %}
+    <div><h2 class="mini">More campaigns you might like</h2>
+      <div class="cgrid cgrid-2">{% for m in more %}
+        <article class="ccard"><a class="ccard-link" href="{% url 'campaign' m.pk %}" aria-label="Open {{ m.title }}"></a>
+          <div class="ccard-top"><span class="avatar {{ m.brand.profile.avatar_class }}" aria-hidden="true">{{ m.brand.profile.initial }}</span><div><b>{{ m.brand.profile.display_name }}</b></div></div>
+          <h3>{{ m.title }}</h3><div class="ccard-foot"><div><b class="budget">{{ m.budget|rupees }}</b></div></div></article>{% endfor %}
+      </div></div>
+    {% endif %}
+  </div>
+
+  <aside class="cdet-side">
+    <section class="panel apply-panel" id="apply">
+      <p class="muted">Budget</p>
+      <p class="big-budget">{{ c.budget|rupees }}</p>
+      <p class="applied-line"><b>{{ n_apps }}</b> creator{{ n_apps|pluralize }} applied</p>
+      {% if can_apply %}
+      <form method="post" action="{% url 'campaign_apply' c.pk %}">
+        {% csrf_token %}
+        {% for field in form %}{% include "core/_field.html" %}{% endfor %}
+        <small class="count" data-count-for="id_message"></small>
+        <button class="btn btn-primary btn-block">Apply now</button>
+      </form>
+      <p class="fine">The brand sees your profile and message. Your phone number stays private.</p>
+      {% elif applied %}<p class="notice done-note">You've applied. The brand will reply in your inbox if interested.</p>
+      {% elif is_owner %}<p class="notice">This is your campaign. Applicants appear on the left.</p>
+      {% elif not c.is_open %}<p class="notice">This campaign is closed.</p>
+      {% elif not user.is_authenticated %}<a class="btn btn-primary btn-block" href="{% url 'login' %}?next={{ request.path }}">Sign in to apply</a><p class="fine">New here? <a href="{% url 'signup' %}">Join free</a></p>
+      {% else %}<p class="notice">Only creator accounts can apply.</p>{% endif %}
+      <button type="button" class="btn btn-quiet btn-block" data-copy>Share this campaign</button>
+    </section>
+  </aside>
+</section>
+{% if can_apply %}<div class="apply-bar"><span><b>{{ c.budget|rupees }}</b><small>budget</small></span><a class="btn btn-primary" href="#apply">Apply</a></div>{% endif %}
+{% endwith %}
+{% endblock %}

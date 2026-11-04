@@ -1,0 +1,31 @@
+{% extends "core/base.html" %}
+{% block title %}How ranking works · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap narrow how">
+  <h1>How ranking works.</h1>
+  <p class="lead-s">One simple score, the same rules for everyone, nothing hidden.</p>
+
+  <div class="panel">
+    <h2>Your score, out of 100</h2>
+    <ul class="plain">
+      <li><b>Audience size (up to 35).</b> More followers earn more points, with diminishing returns so small creators can still compete.</li>
+      <li><b>Engagement (up to 25).</b> Likes and comments compared with your followers. Active small audiences beat quiet big ones.</li>
+      <li><b>Complete profile (up to 25).</b> Name, bio, niche, city, followers, engagement and price.</li>
+      <li><b>Reel showcase (up to 10).</b> Add three reels to earn it all.</li>
+      <li><b>Verified (5).</b> We check your Instagram and add the tick.</li>
+    </ul>
+  </div>
+
+  <div class="panel">
+    <h2>Who goes first?</h2>
+    <p>The highest score is number one. If two creators have the same score, the one with more followers goes first. If that is also equal, whoever joined earlier goes first. The order is the same for everyone.</p>
+  </div>
+
+  <div class="panel">
+    <h2>It's free for now</h2>
+    <p>Profiles, rankings, reels and offers are free while we grow. Nobody can pay for a higher score, and we'll tell you well before anything changes.</p>
+  </div>
+
+  <div class="cta"><a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join free</a><a class="btn btn-ghost btn-lg" href="{% url 'leaderboard' %}">See the leaderboard</a></div>
+</section>
+{% endblock %}

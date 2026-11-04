@@ -1,0 +1,96 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% block content %}
+<section class="hero wrap">
+  <div class="hero-copy">
+    <h1>Get found by the brands in your city.</h1>
+    <p class="lead">Build a free profile, climb the leaderboard and get hired directly by Ahmedabad brands.</p>
+    <form class="hero-search" action="{% url 'leaderboard' %}" method="get" role="search">
+      <input type="search" name="q" placeholder="Search a creator or handle" aria-label="Search creators">
+      <input type="hidden" name="city" value="Ahmedabad">
+      <button class="btn btn-primary">Search</button>
+    </form>
+    <div class="chips" aria-label="Browse by niche">
+      {% for k, label in niches|slice:":6" %}<a class="chip" href="{% url 'leaderboard' %}?city=Ahmedabad&amp;niche={{ k }}">{{ label }}</a>{% endfor %}
+    </div>
+    <div class="cta">
+      <a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join free</a>
+      <a class="btn btn-ghost btn-lg" href="{% url 'about' %}">How it works</a>
+    </div>
+  </div>
+  {% include "core/_scene.html" %}
+</section>
+
+<section class="wrap statband" aria-label="Network at a glance">
+  <div><b data-count="{{ stats.creators }}">{{ stats.creators }}</b><span>Creators</span></div>
+  <div><b data-count="{{ stats.brands }}">{{ stats.brands }}</b><span>Brands</span></div>
+  <div><b data-count="{{ stats.campaigns }}">{{ stats.campaigns }}</b><span>Open campaigns</span></div>
+  <div><b data-count="{{ stats.reach }}" data-format="compact">{{ stats.reach|compact }}</b><span>Combined followers</span></div>
+</section>
+
+{% if featured %}
+<section class="wrap shelf">
+  <div class="sec-head"><h2>Featured creators</h2></div>
+  <div class="rows rows-featured" data-rows>{% for p in featured %}{% include "core/_row.html" %}{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="wrap steps-sec">
+  <h2>Three simple steps.</h2>
+  <ol class="steps">
+    <li><span class="num">1</span><h3>Make your page</h3><p>Add your details and your best reels. It takes five minutes.</p></li>
+    <li><span class="num">2</span><h3>Get ranked</h3><p>You get a score and a place on the leaderboard. The rules are public.</p></li>
+    <li><span class="num">3</span><h3>Get hired</h3><p>Brands send offers straight to you. Chat, agree, and get to work.</p></li>
+  </ol>
+</section>
+
+<section class="wrap champs-sec">
+  <h2>Who's number one in each niche?</h2>
+  <p class="lead-s">Every niche has a crown. Take it by climbing the leaderboard.</p>
+  <div class="champs">
+    {% for k, label, p in champions %}
+    {% if p %}
+    <a class="champ" href="{% url 'leaderboard' %}?niche={{ k }}">
+      <span class="champ-niche">{{ label }}</span>
+      <span class="avatar {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+      <strong>{{ p.display_name }}</strong>
+      <span class="muted">@{{ p.handle }}</span>
+      <span class="score">{{ p.rank_score }}</span>
+      <svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 10H5z"/></svg>
+    </a>
+    {% else %}
+    <a class="champ open" href="{% url 'signup' %}">
+      <span class="champ-niche">{{ label }}</span>
+      <span class="avatar-ghost" aria-hidden="true">?</span>
+      <strong>Unclaimed</strong>
+      <span class="muted">Be the first {{ label|lower }} creator</span>
+    </a>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
+{% if top %}
+<section class="wrap">
+  <div class="sec-head"><h2>Top creators right now</h2><a class="link" href="{% url 'leaderboard' %}">View all</a></div>
+  <div class="rows" data-rows>
+    {% for p in top %}{% include "core/_row.html" with rank=forloop.counter %}{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{% if rising %}
+<section class="wrap shelf">
+  <div class="sec-head"><h2>Rising stars</h2><span class="muted">New this month</span></div>
+  <div class="rows" data-rows>{% for p in rising %}{% include "core/_row.html" %}{% endfor %}</div>
+</section>
+{% endif %}
+
+<section class="wrap launch-band">
+  <div>
+    <h2>Free while we launch.</h2>
+    <p class="lead-s">Profiles, rankings, reels and offers cost nothing. Join early and claim your spot.</p>
+  </div>
+  <a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join free</a>
+</section>
+{% endblock %}

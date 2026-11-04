@@ -1,0 +1,63 @@
+{% extends "core/base.html" %}
+{% block title %}About · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap about-hero">
+  <p class="eyebrow">About {{ SITE_NAME }}</p>
+  <h1>Good work should get found.</h1>
+  <p class="lead-l">Ahmedabad has thousands of talented Instagram creators, and thousands of businesses that want to work with them. They just can't find each other easily. {{ SITE_NAME }} is one simple place where they meet.</p>
+</section>
+
+<section class="wrap why">
+  <div class="why-card"><h3>Why we made it</h3><p>Creators were sending hundreds of messages hoping a brand would reply. Brands were searching through endless profiles with no idea who was real. Both lose time. We wanted a calm, fair place where good creators rise by their work.</p></div>
+  <div class="why-card"><h3>What makes it different</h3><p>Everyone is ranked by the same public score. No one can pay to rank higher. Phone numbers stay private until both sides agree to work together.</p></div>
+</section>
+
+<section class="wrap how-sec" data-tabs>
+  <h2>How it works</h2>
+  <div class="seg" role="tablist" aria-label="Choose who you are">
+    <button type="button" role="tab" class="on" data-tab="creator" aria-selected="true">I'm a creator</button>
+    <button type="button" role="tab" data-tab="brand" aria-selected="false">I'm a brand</button>
+  </div>
+  <ol class="steps steps-3" data-panel="creator">
+    <li><span class="num">1</span><h3>Join and fill your page</h3><p>Add your name, city, niche and followers. Add three of your best reels.</p></li>
+    <li><span class="num">2</span><h3>See where you rank</h3><p>You get a score out of 100 and a place on the city leaderboard.</p></li>
+    <li><span class="num">3</span><h3>Get offers and chat</h3><p>Brands send offers to you. Say yes or no, chat, and agree the work.</p></li>
+  </ol>
+  <ol class="steps steps-3" data-panel="brand" hidden>
+    <li><span class="num">1</span><h3>Join as a brand</h3><p>Create a free account with your brand name. No setup cost.</p></li>
+    <li><span class="num">2</span><h3>Find the right creator</h3><p>Filter by niche and city. Watch their reels right on their page.</p></li>
+    <li><span class="num">3</span><h3>Send an offer</h3><p>Tell them what you need and your budget. When they accept, you can chat and share contacts.</p></li>
+  </ol>
+</section>
+
+<section class="wrap tips-sec">
+  <h2>Tips to get the best from it</h2>
+  <div class="tips">
+    <div><b>Add three reels</b><p>Brands trust what they can see. Pages with reels get noticed first.</p></div>
+    <div><b>Be honest with numbers</b><p>Real numbers build trust. Brands check the reels anyway.</p></div>
+    <div><b>Reply within a day</b><p>Quick replies win work. A short "I'm interested" is enough to start.</p></div>
+    <div><b>Keep it in the chat</b><p>Agree the work in the offer chat first. Share your phone number only when you're comfortable.</p></div>
+  </div>
+</section>
+
+<section class="wrap faq">
+  <h2>Quick answers</h2>
+  <details><summary>Is it really free?</summary><p>Yes. Joining, ranking, showing reels and receiving offers cost nothing right now. We'll always tell you well before that changes.</p></details>
+  <details><summary>Who can see my phone number?</summary><p>Nobody, unless you choose. It is shared with a brand only after you accept their offer.</p></details>
+  <details><summary>How is my rank decided?</summary><p>By a public score from your audience, engagement, a complete page and your reels. <a href="{% url 'how' %}">See the full rules.</a></p></details>
+  <details><summary>Do I pay through {{ SITE_NAME }}?</summary><p>No. You and the brand agree payment between yourselves. We never ask for money, cards or UPI PINs.</p></details>
+</section>
+
+<section class="wrap maker">
+  <a class="maker-card" href="{{ ZYRAC_URL }}" target="_blank" rel="noopener noreferrer" aria-label="Made by Zyrac. Opens Zyrac on Instagram in a new tab.">
+    <span class="maker-z" aria-hidden="true">Z</span>
+    <span class="maker-text"><small>Designed &amp; built by</small><b>Zyrac</b><span>from Ahmedabad, with love for local talent</span></span>
+    <span class="maker-go">@zyrac__ <i aria-hidden="true">›</i></span>
+  </a>
+</section>
+
+<section class="wrap launch-band">
+  <div><h2>Ready to start?</h2><p class="lead-s">It takes about five minutes and it's free.</p></div>
+  <a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join free</a>
+</section>
+{% endblock %}

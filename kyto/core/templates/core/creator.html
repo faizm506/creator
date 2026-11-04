@@ -1,0 +1,120 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% block title %}{{ p.display_name }} (@{{ p.handle }}) · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="cover {{ p.avatar_class }}" aria-hidden="true"></div>
+<section class="wrap pf">
+  <header class="pf-head">
+    <span class="avatar avatar-xl {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+    <div class="pf-id">
+      <h1>{{ p.display_name }}{% if p.verified %}<svg class="tick tick-lg" viewBox="0 0 20 20" aria-label="Verified"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.3l2.6 2.6 5.4-5.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endif %}</h1>
+      <p class="muted">@{{ p.handle }}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</p>
+    </div>
+    <div class="pf-actions">
+      {% include "core/_hire_btn.html" %}
+      <a class="btn btn-ghost" href="{% url 'go' p.handle %}" target="_blank" rel="noopener noreferrer">Instagram</a>
+      {% if can_contact %}<a class="btn btn-ghost" href="https://wa.me/{{ p.whatsapp|cut:'+' }}" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+      {% elif p.show_contact and p.whatsapp %}<a class="btn btn-ghost" href="{% url 'login' %}?next={{ request.path }}">Sign in to contact</a>{% endif %}
+      <button type="button" class="btn btn-ghost" data-copy>Copy link</button>
+      {% if is_owner %}<a class="btn btn-quiet" href="{% url 'settings' %}">Edit</a>{% endif %}
+    </div>
+  </header>
+  {% if badges %}<ul class="badges">{% for b in badges %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+  {% if p.bio %}<p class="bio">{{ p.bio }}</p>{% endif %}
+
+  <div class="pf-grid">
+    <div class="pf-main">
+      {% if p.is_creator %}
+      <section class="panel" aria-labelledby="reels-h">
+        <div class="panel-head"><h2 id="reels-h">Top reels</h2><a class="link" href="{% url 'go' p.handle %}" target="_blank" rel="noopener noreferrer">See all on Instagram</a></div>
+        {% if showcase %}
+        <div class="reels">
+          {% for s in showcase %}
+          <article class="reel">
+            <button type="button" class="reel-face {{ p.avatar_class }}" data-embed="{{ s.embed_url }}" aria-label="Play {{ s.get_kind_display }} {{ forloop.counter }} by @{{ p.handle }}">
+              <span class="play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>
+              <span class="reel-label">{{ s.get_kind_display }} {{ forloop.counter }} · tap to play</span>
+            </button>
+            <a class="reel-open" href="{{ s.url }}" target="_blank" rel="noopener noreferrer">Open on Instagram</a>
+          </article>
+          {% endfor %}
+        </div>
+        {% elif is_owner %}
+        <div class="empty"><h3>Show brands your best work.</h3><p>Add up to 6 reels. Three reels earn you 10 score points.</p><a class="btn btn-primary" href="{% url 'settings' %}#showcase">Add your first reel</a></div>
+        {% else %}
+        <div class="empty"><p>No reels showcased yet. See the latest on Instagram.</p></div>
+        {% endif %}
+      </section>
+
+      <section class="panel" aria-labelledby="score-h">
+        <div class="panel-head"><h2 id="score-h">How the score adds up</h2></div>
+        <ul class="parts">
+          {% for label, v, mx in p.score_parts %}
+          <li><span>{{ label }}</span><progress max="{{ mx }}" value="{{ v|stringformat:'.2f' }}" data-anim></progress><b>{{ v|floatformat:1 }}<small>/{{ mx }}</small></b></li>
+          {% endfor %}
+        </ul>
+        <p class="fine">Follower and engagement numbers are self-reported. The verified tick means we checked them.</p>
+      </section>
+      {% endif %}
+
+      {% if similar %}
+      <section aria-labelledby="sim-h">
+        <h2 class="mini" id="sim-h">Other {{ p.get_niche_display|lower }} creators</h2>
+        <div class="rows" data-rows>{% for sp in similar %}{% include "core/_row.html" with p=sp %}{% endfor %}</div>
+      </section>
+      {% endif %}
+    </div>
+
+    {% if p.is_creator %}
+    <aside class="pf-side">
+      <section class="panel score-panel">
+        <div class="ring-wrap">
+          <svg class="ring-svg" viewBox="0 0 140 140" role="img" aria-label="Score {{ p.rank_score }} out of 100">
+            <defs><linearGradient id="rg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff9f0a"/><stop offset="1" stop-color="#ff375f"/></linearGradient></defs>
+            <circle class="ring-bg" cx="70" cy="70" r="58"/>
+            <circle class="ring-fg" cx="70" cy="70" r="58" data-score="{{ p.rank_score|stringformat:'.1f' }}"/>
+          </svg>
+          <div class="ring-num"><b>{{ p.rank_score }}</b><span>out of 100</span></div>
+        </div>
+        <p class="top-pct">Top {{ info.top_pct }}% of {{ info.total }} creators</p>
+        <div class="tiles">
+          <div><b>#{{ info.overall }}</b><span>Overall</span></div>
+          <div><b>{% if info.city %}#{{ info.city }}{% else %}–{% endif %}</b><span>{% if p.city %}{{ p.city }}{% else %}City{% endif %}</span></div>
+          <div><b>{% if info.niche %}#{{ info.niche }}{% else %}–{% endif %}</b><span>{% if p.niche %}{{ p.get_niche_display }}{% else %}Niche{% endif %}</span></div>
+        </div>
+      </section>
+      <section class="panel facts">
+        <dl>
+          <div><dt>Followers</dt><dd>{{ p.followers|compact }}</dd></div>
+          <div><dt>Engagement</dt><dd>{{ p.engagement }}%</dd></div>
+          <div><dt>Engaged people per post</dt><dd>~{{ p.engaged_per_post|compact }}</dd></div>
+          {% if p.rate_per_post %}<div><dt>Rate per post</dt><dd>{{ p.rate_per_post|rupees }}</dd></div>
+          {% elif rate %}<div><dt>Fair rate estimate</dt><dd>{{ rate.0|rupees }}–{{ rate.1|rupees }}</dd></div>{% endif %}
+          {% if p.views >= 10 %}<div><dt>Profile views</dt><dd>{{ p.views|compact }}</dd></div>{% endif %}
+        </dl>
+      </section>
+      {% if user.is_authenticated and user.profile.role == "brand" %}
+      <section class="panel hire-panel">
+        <h3>Work with {{ p.display_name }}</h3>
+        <p>Send a direct offer. Their WhatsApp is shared only if they accept.</p>
+        <a class="btn btn-primary btn-block" href="{% url 'offer_new' p.handle %}">Send an offer</a>
+      </section>
+      {% endif %}
+      {% if not user.is_authenticated %}
+      <section class="join-cta">
+        <h3>Want a page like this?</h3>
+        <p>Join free, add your reels and see where you rank in {% if p.city %}{{ p.city }}{% else %}your city{% endif %}.</p>
+        <a class="btn btn-lg" href="{% url 'signup' %}">Create my profile</a>
+      </section>
+      {% endif %}
+    </aside>
+    {% endif %}
+  </div>
+</section>
+
+<div class="pf-bar">
+  {% include "core/_hire_btn.html" %}
+  <a class="btn btn-ghost" href="{% url 'go' p.handle %}" target="_blank" rel="noopener noreferrer">Instagram</a>
+  {% if can_contact %}<a class="btn btn-ghost" href="https://wa.me/{{ p.whatsapp|cut:'+' }}" target="_blank" rel="noopener noreferrer">WhatsApp</a>{% else %}<button type="button" class="btn btn-ghost" data-copy>Copy link</button>{% endif %}
+</div>
+{% endblock %}

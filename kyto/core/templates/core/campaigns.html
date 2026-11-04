@@ -1,0 +1,57 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% block title %}Campaigns · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap page-head">
+  <div class="ph-row">
+    <div><h1>Campaigns</h1><p class="lead-s">Real work from brands. Find one that fits you and apply.</p></div>
+    {% if user.is_authenticated and user.profile.role == "brand" %}<a class="btn btn-primary btn-lg" href="{% url 'campaign_new' %}">Post a campaign</a>
+    {% elif not user.is_authenticated %}<a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join as a brand</a>{% endif %}
+  </div>
+  <div class="chips" role="group" aria-label="Filter by niche">
+    <a class="chip{% if not niche %} on{% endif %}" href="?sort={{ sort }}">All</a>
+    {% for k, label in niches %}<a class="chip{% if k == niche %} on{% endif %}" href="?niche={{ k }}&amp;sort={{ sort }}">{{ label }}</a>{% endfor %}
+  </div>
+  <div class="sortbar"><span class="muted">Sort by</span>
+    <a class="chip{% if sort == 'new' %} on{% endif %}" href="?niche={{ niche }}&amp;sort=new">Newest</a>
+    <a class="chip{% if sort == 'budget' %} on{% endif %}" href="?niche={{ niche }}&amp;sort=budget">Highest budget</a>
+  </div>
+</section>
+
+<section class="wrap">
+  {% if page %}
+  <div class="cgrid" data-rows>
+    {% for c in page %}
+    <article class="ccard">
+      <a class="ccard-link" href="{% url 'campaign' c.pk %}" aria-label="Open {{ c.title }}"></a>
+      <div class="ccard-top">
+        <span class="avatar {{ c.brand.profile.avatar_class }}" aria-hidden="true">{{ c.brand.profile.initial }}</span>
+        <div><b>{{ c.brand.profile.display_name }}</b><span class="muted">{{ c.created|timesince }} ago</span></div>
+      </div>
+      <h3>{{ c.title }}</h3>
+      <p class="ccard-desc">{{ c.description|truncatewords:20 }}</p>
+      <div class="tags">
+        {% if c.niche %}<span class="tag">{{ c.get_niche_display }}</span>{% endif %}
+        {% if c.city %}<span class="tag">{{ c.city }}</span>{% endif %}
+        {% for d in c.deliverables|chips|slice:":2" %}<span class="tag tag-soft">{{ d }}</span>{% endfor %}
+      </div>
+      <div class="ccard-foot">
+        <div><b class="budget">{{ c.budget|rupees }}</b><span class="muted">budget</span></div>
+        <span class="applied">{{ c.n_apps }} applied</span>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if not page.object_list %}
+  <div class="empty empty-card"><h3>No campaigns here yet.</h3><p>Try another niche, or check back soon. Brands post new work often.</p><a class="btn btn-ghost" href="?">See all campaigns</a></div>
+  {% endif %}
+  {% if page.paginator.num_pages > 1 %}
+  <nav class="pager" aria-label="Pages">
+    {% if page.has_previous %}<a class="btn btn-ghost" href="?niche={{ niche }}&amp;sort={{ sort }}&amp;page={{ page.previous_page_number }}">Previous</a>{% endif %}
+    <span class="muted">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}<a class="btn btn-ghost" href="?niche={{ niche }}&amp;sort={{ sort }}&amp;page={{ page.next_page_number }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

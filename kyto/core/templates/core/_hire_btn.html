@@ -1,0 +1,1 @@
+{% if p.is_creator %}{% if user.is_authenticated %}{% if user.profile.role == "brand" %}<a class="btn btn-primary" href="{% url 'offer_new' p.handle %}">Hire {{ p.display_name|truncatechars:16 }}</a>{% endif %}{% else %}<a class="btn btn-primary" href="{% url 'login' %}?next={% url 'offer_new' p.handle %}">Hire</a>{% endif %}{% endif %}

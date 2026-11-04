@@ -1,0 +1,16 @@
+{% extends "core/base.html" %}
+{% block title %}Sign in · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap auth">
+  <h1>Welcome back</h1>
+  <p class="lead-s">Sign in with your Instagram handle.</p>
+  <form method="post" class="group">
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% if form.errors %}<p class="notice err-box">That handle and password don't match. Check both and try again.</p>{% endif %}
+    {% for field in form %}{% include "core/_field.html" %}{% endfor %}
+    <button class="btn btn-primary btn-block">Sign in</button>
+  </form>
+  <p class="fine"><a href="{% url 'password_reset' %}">Forgot your password?</a> · New here? <a href="{% url 'signup' %}">Join free</a></p>
+</section>
+{% endblock %}

@@ -1,0 +1,137 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% block title %}Settings · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap st">
+  <header class="st-head">
+    <span class="avatar avatar-lg {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+    <div class="st-who">
+      <h1>{{ p.display_name }}</h1>
+      <p class="muted">@{{ p.handle }} · {{ p.get_role_display }}</p>
+      <div class="st-tags">
+        {% if p.verified %}<span class="pill pill-approved">Verified</span>{% endif %}
+        {% if p.is_boosted %}<span class="pill pill-boost">Featured until {{ p.boost_until|date:"j M" }}</span>{% endif %}
+      </div>
+    </div>
+    <a class="btn btn-ghost" href="{% url 'creator' p.handle %}">View public page</a>
+  </header>
+
+  <div class="st-grid">
+    <nav class="st-nav" aria-label="Settings sections">
+      <a href="#overview" class="on">Overview</a>
+      <a href="#profile">Profile</a>
+      {% if p.is_creator %}<a href="#showcase">Showcase</a>{% endif %}
+      <a href="#security">Security</a>
+      {% if p.is_creator and BOOST_ENABLED %}<a href="#boost">Boost</a>{% endif %}
+    </nav>
+
+    <div class="st-body">
+      <section id="overview" class="st-sec">
+        <h2>Overview</h2>
+        {% if p.is_creator %}
+        <div class="kpis">
+          <div><b>#{{ info.overall }}</b><span>Overall rank</span></div>
+          <div><b>{% if info.city %}#{{ info.city }}{% else %}–{% endif %}</b><span>In your city</span></div>
+          <div><b>{{ p.views }}</b><span>Profile views</span></div>
+          <div><b>{{ p.ig_clicks }}</b><span>Instagram visits sent</span></div>
+        </div>
+        <a class="inbox-card" href="{% url 'inbox' %}">
+          <div><b>{{ stats.waiting }} offer{{ stats.waiting|pluralize }} waiting</b><span>{{ stats.hired }} brand{{ stats.hired|pluralize }} hired you so far</span></div><span class="chev">›</span>
+        </a>
+        <div class="summary">
+          <div><span class="muted">Score</span><b>{{ p.rank_score }}</b></div>
+          <div class="grow"><span class="muted">Top {{ info.top_pct }}% of {{ info.total }} creators</span>
+            <progress max="100" value="{{ p.rank_score|stringformat:'.1f' }}" data-anim></progress></div>
+        </div>
+        {% if steps %}
+        <div class="todo"><h3>Your next steps</h3>
+          <ul>{% for text, pts in steps %}<li><span>{{ text }}</span><b>+{{ pts }}</b></li>{% endfor %}</ul></div>
+        {% else %}<p class="notice">Your profile is fully built. Keep your numbers up to date to hold your rank.</p>{% endif %}
+        {% else %}
+        <div class="kpis kpis-3">
+          <div><b>{{ stats.sent }}</b><span>Offers sent</span></div>
+          <div><b>{{ stats.hired }}</b><span>Creators hired</span></div>
+          <div><b>{{ stats.campaigns }}</b><span>Open campaigns</span></div>
+        </div>
+        <a class="inbox-card" href="{% url 'inbox' %}"><div><b>Open your inbox</b><span>Replies from creators appear here</span></div><span class="chev">›</span></a>
+        <div class="cta"><a class="btn btn-primary" href="{% url 'leaderboard' %}">Find creators</a><a class="btn btn-ghost" href="{% url 'campaign_new' %}">Post a campaign</a></div>
+        {% endif %}
+      </section>
+
+      <section id="profile" class="st-sec">
+        <h2>Profile</h2>
+        <form method="post" class="group">
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+          {% for field in form %}{% include "core/_field.html" %}{% endfor %}
+          <button class="btn btn-primary btn-block">Save changes</button>
+        </form>
+        <p class="fine">Follower count and engagement are self-reported. Ask us for the verified tick to earn 5 bonus points.</p>
+      </section>
+
+      {% if p.is_creator %}
+      <section id="showcase" class="st-sec">
+        <h2>Reel showcase</h2>
+        <div class="group">
+          <p class="fine fine-top">Paste links to your best public reels. They play on your page ({{ showcase|length }} of 6 used).</p>
+          {% if showcase %}
+          <ul class="history sc-list">
+            {% for s in showcase %}
+            <li><span>{{ s.get_kind_display }} · {{ s.code }}</span>
+              <a href="{{ s.url }}" target="_blank" rel="noopener noreferrer">Open</a>
+              <form method="post" action="{% url 'showcase_remove' s.pk %}">{% csrf_token %}<button class="btn btn-quiet">Remove</button></form></li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          <form method="post" action="{% url 'showcase_add' %}" class="sc-add">
+            {% csrf_token %}
+            <input type="text" name="url" placeholder="https://www.instagram.com/reel/…" aria-label="Instagram reel link" required maxlength="200" inputmode="url" autocapitalize="none">
+            <button class="btn btn-primary">Add</button>
+          </form>
+          <p class="fine">In Instagram, open the reel, tap Share, then Copy link.</p>
+        </div>
+      </section>
+      {% endif %}
+
+      <section id="security" class="st-sec">
+        <h2>Security</h2>
+        <div class="shield">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6z"/><path d="M8.5 12l2.4 2.4 4.6-4.8"/></svg>
+          <div><b>Your account is protected</b><span>Passwords are stored as one-way hashes, every form is CSRF-protected, and sign-in attempts are rate-limited.</span></div>
+        </div>
+        <ul class="srows">
+          <li><div><b>Password</b><span>Changing it signs out other devices</span></div><a class="btn btn-ghost" href="{% url 'password' %}">Change</a></li>
+          <li><div><b>Email</b><span>{{ request.user.email|mask_email }}</span></div></li>
+          <li><div><b>Last sign-in</b><span>{{ request.user.last_login|date:"j M Y, g:i a"|default:"This session" }}</span></div></li>
+          <li><div><b>Other devices</b><span>Sign out everywhere except here</span></div>
+            <form method="post" action="{% url 'logout_others' %}" data-confirm="Sign out all other devices?">{% csrf_token %}<button class="btn btn-ghost">Sign out others</button></form></li>
+          <li><div><b>WhatsApp privacy</b><span>{% if p.show_contact %}Shown to signed-in members{% else %}Shared only with someone whose offer you accept{% endif %}. Change it in Profile.</span></div></li>
+          <li><div><b>Payments</b><span>Everything is free right now. We never ask for your UPI PIN, card or bank details.</span></div></li>
+        </ul>
+        <details class="danger">
+          <summary>Delete account</summary>
+          <p>This permanently removes your profile, offers and messages. It can't be undone.</p>
+          <form method="post" action="{% url 'delete_account' %}" data-confirm="Delete your account for good?">
+            {% csrf_token %}
+            <input type="password" name="password" placeholder="Confirm your password" autocomplete="current-password" aria-label="Password" required>
+            <button class="btn btn-danger">Delete my account</button>
+          </form>
+        </details>
+      </section>
+
+      {% if p.is_creator and BOOST_ENABLED %}
+      <section id="boost" class="st-sec">
+        <h2>Boost</h2>
+        <a class="boost-card{% if p.is_boosted %} on{% endif %}" href="{% url 'boost' %}">
+          <div>
+            <strong>{% if p.is_boosted %}Boost is active{% else %}Boost your profile{% endif %}</strong>
+            <span>{% if p.is_boosted %}Featured until {{ p.boost_until|date:"j M Y" }}. Tap to extend.{% elif pending %}Payment submitted, waiting for confirmation.{% else %}Get the Featured spot in your niche. From ₹99.{% endif %}</span>
+          </div><span class="chev" aria-hidden="true">›</span>
+        </a>
+        {% if p.boost_impressions %}<p class="notice">Your boost has been shown <b>{{ p.boost_impressions }}</b> times on the Featured shelf.</p>{% endif %}
+      </section>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

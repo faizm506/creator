@@ -1,0 +1,13 @@
+{% extends "core/base.html" %}
+{% block title %}Post a campaign · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap narrow">
+  <h1>Post a campaign</h1>
+  <p class="lead-s">Tell creators what you need. It takes two minutes.</p>
+  <form method="post" class="group">
+    {% csrf_token %}
+    {% for field in form %}{% include "core/_field.html" %}{% endfor %}
+    <button class="btn btn-primary btn-block">Post campaign</button>
+  </form>
+</section>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "core/base.html" %}
+{% block content %}
+<section class="wrap auth">
+  {% if validlink %}
+  <h1>Choose a new password</h1>
+  <form method="post" class="group">
+    {% csrf_token %}
+    {% for field in form %}{% include "core/_field.html" %}{% endfor %}
+    <button class="btn btn-primary btn-block">Save new password</button>
+  </form>
+  {% else %}
+  <h1>This link has expired</h1>
+  <p class="lead-s">Reset links work once and last one hour. Request a new one and try again.</p>
+  <a class="btn btn-primary" href="{% url 'password_reset' %}">Get a new link</a>
+  {% endif %}
+</section>
+{% endblock %}

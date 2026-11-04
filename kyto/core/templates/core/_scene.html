@@ -1,0 +1,60 @@
+{% url 'leaderboard' as lb %}
+<div class="scene" data-scene>
+<svg viewBox="0 0 600 400" role="img" aria-label="Illustrated Ahmedabad skyline: Teen Darwaza, Sidi Saiyyed Jali, Jhulta Minara and the Atal Bridge over the Sabarmati">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="g-sky1"/><stop offset="1" class="g-sky2"/></linearGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="0" y2="1"><stop offset="0" class="g-riv1"/><stop offset="1" class="g-riv2"/></linearGradient>
+  </defs>
+  <rect width="600" height="400" fill="url(#sky)"/>
+  <circle class="sun" cx="470" cy="108" r="40"/>
+  <g class="layer l-far"><path class="far" d="M-20 340V262h40v-20h30v30h36v-45h26v45h40v-25h34v25h50v-60h22v60h46v-30h30v30h60v-40h28v40h50v-20h40v20h70v68Z"/></g>
+  <g class="layer l-kites">
+    <g transform="translate(110 78)"><g class="kk k1"><path d="M0-16 11 0 0 20-11 0Z" fill="#ff375f"/><path d="M0-16V20M-11 0H11" stroke="#fff" stroke-opacity=".6"/><path d="M0 20q-6 14 2 26t-2 24" stroke="#ff375f" fill="none" stroke-width="1.5"/></g></g>
+    <g transform="translate(300 52)"><g class="kk k2"><path d="M0-16 11 0 0 20-11 0Z" fill="#ffd60a"/><path d="M0-16V20M-11 0H11" stroke="#fff" stroke-opacity=".6"/><path d="M0 20q-6 14 2 26t-2 24" stroke="#ffd60a" fill="none" stroke-width="1.5"/></g></g>
+    <g transform="translate(556 62)"><g class="kk k3"><path d="M0-16 11 0 0 20-11 0Z" fill="#0a84ff"/><path d="M0-16V20M-11 0H11" stroke="#fff" stroke-opacity=".6"/><path d="M0 20q-6 14 2 26t-2 24" stroke="#0a84ff" fill="none" stroke-width="1.5"/></g></g>
+  </g>
+  <g class="layer l-mid">
+    <rect class="bank" x="0" y="330" width="600" height="14"/>
+
+    <g class="lm" tabindex="0" role="button" aria-label="Teen Darwaza, food creators" data-name="Teen Darwaza" data-label="food" data-href="{{ lb }}?city=Ahmedabad&amp;niche=food" data-note="The triple-arched royal gate by Bhadra Fort, and the doorway to Manek Chowk's street food.">
+      <rect class="s" x="34" y="190" width="172" height="12"/><rect class="s" x="40" y="200" width="160" height="138"/>
+      <path class="s" d="M42 190v-10h12v10zM68 190v-10h12v10zM94 190v-10h12v10zM120 190v-10h12v10zM146 190v-10h12v10zM172 190v-10h12v10z"/>
+      <path class="hole" d="M58 338V282a14 14 0 0 1 28 0V338ZM102 338V262a18 18 0 0 1 36 0V338ZM154 338V282a14 14 0 0 1 28 0V338Z"/>
+      <g transform="translate(120 160)"><circle class="ring" r="10"/><circle class="pin" r="5"/></g>
+    </g>
+
+    <g class="lm" tabindex="0" role="button" aria-label="Sidi Saiyyed Jali, fashion creators" data-name="Sidi Saiyyed ni Jali" data-label="fashion" data-href="{{ lb }}?city=Ahmedabad&amp;niche=fashion" data-note="The carved stone window of a curling tree that became Ahmedabad's emblem. Pattern, texture, style.">
+      <path class="s" d="M236 338V232a69 40 0 0 1 138 0V338Z"/>
+      <path class="hole" d="M262 332V262a43 43 0 0 1 86 0V332Z"/>
+      <path class="frame" d="M256 332V262a49 49 0 0 1 98 0V332"/>
+      <path class="jali" d="M305 332C304 316 309 306 305 292S300 270 306 254C306 244 312 238 319 238M305 318C296 316 286 311 284 301C282 293 291 290 294 296C296 301 291 304 289 301M306 306C316 305 328 300 331 290C333 281 324 278 321 284C319 289 324 291 326 288M305 288C296 284 286 277 287 267C288 259 297 259 298 265C298 269 294 270 293 267M306 272C314 268 322 262 322 253C322 246 314 245 313 250M306 254C306 246 303 239 297 235"/>
+      <circle class="leaf" cx="319" cy="238" r="3.4"/><circle class="leaf" cx="297" cy="235" r="3.4"/><circle class="leaf" cx="289" cy="301" r="2.8"/><circle class="leaf" cx="326" cy="288" r="2.8"/><circle class="leaf" cx="293" cy="267" r="2.8"/><circle class="leaf" cx="313" cy="250" r="2.8"/>
+      <g transform="translate(305 192)"><circle class="ring" r="10"/><circle class="pin" r="5"/></g>
+    </g>
+
+    <g class="lm" tabindex="0" role="button" aria-label="Jhulta Minara, travel creators" data-name="Jhulta Minara" data-label="travel" data-href="{{ lb }}?city=Ahmedabad&amp;niche=travel" data-note="The shaking minarets of Sidi Bashir Mosque. Heritage walks and weekend stories start here.">
+      <rect class="s" x="398" y="292" width="74" height="46"/>
+      <rect class="s" x="408" y="176" width="16" height="118"/><rect class="s" x="446" y="176" width="16" height="118"/>
+      <path class="s" d="M408 176a8 8 0 0 1 16 0zM446 176a8 8 0 0 1 16 0z"/>
+      <rect class="s" x="403" y="214" width="26" height="5"/><rect class="s" x="441" y="214" width="26" height="5"/>
+      <rect class="s" x="403" y="252" width="26" height="5"/><rect class="s" x="441" y="252" width="26" height="5"/>
+      <path class="hole" d="M414 338v-22a21 21 0 0 1 42 0v22z"/>
+      <g transform="translate(435 150)"><circle class="ring" r="10"/><circle class="pin" r="5"/></g>
+    </g>
+
+    <g class="lm" tabindex="0" role="button" aria-label="Atal Bridge and Sabarmati Riverfront, fitness creators" data-name="Atal Bridge &amp; Riverfront" data-label="fitness" data-href="{{ lb }}?city=Ahmedabad&amp;niche=fitness" data-note="The pedestrian bridge over the Sabarmati. Morning runs, cycling and workouts along the walkway.">
+      <rect width="130" height="75" x="476" y="268" fill="transparent"/>
+      <path class="bridge" d="M476 338Q541 268 600 338"/>
+      <path class="bridge thin" d="M498 338V316M522 338V304M541 338V302M560 338V304M582 338V318"/>
+      <g transform="translate(540 262)"><circle class="ring" r="10"/><circle class="pin" r="5"/></g>
+    </g>
+  </g>
+  <rect y="344" width="600" height="56" fill="url(#river)"/>
+  <path class="wave w1" d="M-60 362q30-8 60 0t60 0 60 0 60 0 60 0 60 0 60 0 60 0 60 0 60 0 60 0 60 0"/>
+  <path class="wave w2" d="M-60 384q30-8 60 0t60 0 60 0 60 0 60 0 60 0 60 0 60 0 60 0 60 0 60 0 60 0"/>
+</svg>
+<div class="scene-cap" aria-live="polite">
+  <div><b data-cap-name>Tap a landmark</b><span data-cap-note>Each one opens the creators of that scene in Ahmedabad.</span></div>
+  <a class="btn btn-primary" data-cap-link href="{{ lb }}?city=Ahmedabad">See creators</a>
+</div>
+</div>
