@@ -6,8 +6,8 @@
   <p class="muted"><a href="{% url 'creator' t.handle %}">← Back to profile</a></p>
   <div class="mini-id">
     <span class="avatar avatar-lg {{ t.avatar_class }}" aria-hidden="true">{{ t.initial }}</span>
-    <div><h1>Hire {{ t.display_name }}</h1>
-      <p class="muted">@{{ t.handle }}{% if t.niche %} · {{ t.get_niche_display }}{% endif %}{% if t.city %} · {{ t.city }}{% endif %} · {{ t.followers|compact }} followers · {{ t.engagement }}% engagement</p></div>
+    <div><h1>{% if by_creator %}Pitch {{ t.display_name }}{% else %}Hire {{ t.display_name }}{% endif %}</h1>
+      <p class="muted">@{{ t.handle }}{% if t.niche %} · {{ t.get_niche_display }}{% endif %}{% if t.city %} · {{ t.city }}{% endif %}{% if t.is_creator %} · {{ t.followers|compact }} followers · {{ t.engagement }}% engagement{% elif t.rating_count %} · ★ {{ t.rating_avg|floatformat:1 }} ({{ t.rating_count }}){% endif %}</p></div>
   </div>
   {% if t.rate_per_post %}<p class="notice">Their rate is <b>{{ t.rate_per_post|rupees }}</b> per post.</p>
   {% elif rate %}<p class="notice">A fair range for this audience is about <b>{{ rate.0|rupees }}–{{ rate.1|rupees }}</b> per post. It's an estimate, not their price.</p>{% endif %}
@@ -15,12 +15,12 @@
     {% csrf_token %}
     {{ form.non_field_errors }}
     {% for field in form %}{% include "core/_field.html" %}{% endfor %}
-    <button class="btn btn-primary btn-block">Send offer</button>
+    <button class="btn btn-primary btn-block">{% if by_creator %}Send my pitch{% else %}Send offer{% endif %}</button>
   </form>
   <ul class="assure">
-    <li>The creator sees your offer in their inbox and can ask questions before deciding.</li>
+    <li>{% if by_creator %}The brand sees your pitch in their inbox and can chat before deciding.{% else %}The creator sees your offer in their inbox and can ask questions before deciding.{% endif %}</li>
     <li>WhatsApp numbers stay hidden until they accept.</li>
-    <li>Agree payment terms directly with the creator. Never pay anyone to "unlock" an offer.</li>
+    <li>Agree payment terms directly. Never pay anyone to "unlock" an offer.</li>
   </ul>
 </section>
 {% endblock %}

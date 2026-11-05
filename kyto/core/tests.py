@@ -6,7 +6,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import BoostRequest, Offer, Profile
+from .models import BoostRequest, Offer, Profile, Review, ShopPhoto
 
 User = get_user_model()
 
@@ -142,6 +142,7 @@ class FairnessTests(TestCase):
 
 class HiringTests(TestCase):
     def setUp(self):
+        cache.clear()
         self.brand = make("acme", role="brand")
         self.cr = make("star", followers=9000, engagement=3, whatsapp="919800000001")
         self.other = make("nosy")
@@ -253,6 +254,7 @@ class HardeningTests(TestCase):
 
 class PagesAndCampaignTests(TestCase):
     def setUp(self):
+        cache.clear()
         from .models import Campaign
         self.brand = make("brandy", role="brand")
         self.cr = make("makerx", followers=5000, engagement=3)
@@ -268,12 +270,14 @@ class PagesAndCampaignTests(TestCase):
         self.assertContains(self.client.get(reverse("campaigns")), "Cafe reels")
         self.assertContains(self.client.get(reverse("campaign", args=[self.c.pk])), "2 reels")
 
-    def test_apply_flow_and_owner_sees_applicant(self):
+    def test_apply_flow_and_owner_sees_proposal(self):
         self.client.login(username="makerx", password="pass-12345-xyz")
-        self.client.post(reverse("campaign_apply", args=[self.c.pk]), {"message": "I love cafes"})
-        self.assertEqual(self.c.applications.count(), 1)
+        self.client.post(reverse("campaign_apply", args=[self.c.pk]), {"budget": "8000", "message": "I love cafes"})
+        self.assertEqual(Offer.objects.filter(campaign=self.c, initiator="creator").count(), 1)
         self.client.login(username="brandy", password="pass-12345-xyz")
-        self.assertContains(self.client.get(reverse("campaign", args=[self.c.pk])), "I love cafes")
+        page = self.client.get(reverse("campaign", args=[self.c.pk]))
+        self.assertContains(page, "I love cafes")
+        self.assertContains(page, "Accept")
         self.client.login(username="makerx", password="pass-12345-xyz")
         self.assertNotContains(self.client.get(reverse("campaign", args=[self.c.pk])), "Close campaign")
 
@@ -284,3 +288,226 @@ class PagesAndCampaignTests(TestCase):
         o = Offer.objects.get()
         self.assertContains(self.client.get(reverse("inbox")), "Hello there")
         self.assertContains(self.client.get(reverse("offer", args=[o.pk])), "Hello there")
+
+
+class ProposalFlowTests(TestCase):
+    """Brand posts a campaign, the creator sends a price, the brand accepts."""
+
+    def setUp(self):
+        cache.clear()
+        from .models import Campaign
+        self.brand = make("shopco", role="brand", whatsapp="919811111111")
+        self.cr = make("maker", followers=8000, engagement=4, whatsapp="919822222222")
+        self.c = Campaign.objects.create(brand=self.brand.user, title="Diwali sale", description="Promote us",
+                                         niche="fashion", city="Ahmedabad", budget=10000, deliverables="1 reel")
+
+    def _propose(self):
+        self.client.login(username="maker", password="pass-12345-xyz")
+        self.client.post(reverse("campaign_apply", args=[self.c.pk]), {"budget": "7500", "message": "Count me in"})
+        return Offer.objects.get()
+
+    def test_proposal_is_creator_initiated_with_their_price(self):
+        o = self._propose()
+        self.assertEqual((o.initiator, o.budget, o.status), ("creator", 7500, "pending"))
+
+    def test_creator_cannot_accept_own_proposal_but_brand_can(self):
+        o = self._propose()
+        self.client.post(reverse("offer_action", args=[o.pk, "accept"]))
+        self.assertEqual(Offer.objects.get().status, "pending")
+        self.client.login(username="shopco", password="pass-12345-xyz")
+        self.client.post(reverse("offer_action", args=[o.pk, "accept"]))
+        self.assertEqual(Offer.objects.get().status, "accepted")
+        self.assertContains(self.client.get(reverse("offer", args=[o.pk])), "919822222222")
+
+    def test_brand_sees_accept_buttons_and_creator_does_not(self):
+        o = self._propose()
+        self.assertNotContains(self.client.get(reverse("offer", args=[o.pk])), "Accept this proposal?")
+        self.client.login(username="shopco", password="pass-12345-xyz")
+        self.assertContains(self.client.get(reverse("offer", args=[o.pk])), "Accept this proposal?")
+
+    def test_no_double_proposal(self):
+        self._propose()
+        self.client.post(reverse("campaign_apply", args=[self.c.pk]), {"budget": "6000", "message": "Again"})
+        self.assertEqual(Offer.objects.count(), 1)
+
+    def test_creator_can_pitch_a_brand_directly(self):
+        self.client.login(username="maker", password="pass-12345-xyz")
+        self.client.post(reverse("offer_new", args=["shopco"]),
+                         {"title": "Collab idea", "deliverables": "2 reels", "budget": "9000", "message": "Hi!"})
+        o = Offer.objects.get()
+        self.assertEqual((o.initiator, o.brand_id, o.creator_id), ("creator", self.brand.user_id, self.cr.user_id))
+
+    def test_brand_cannot_hire_another_brand(self):
+        make("otherbrand", role="brand")
+        self.client.login(username="shopco", password="pass-12345-xyz")
+        self.client.post(reverse("offer_new", args=["otherbrand"]),
+                         {"title": "x", "deliverables": "y", "budget": "5000", "message": "z"})
+        self.assertEqual(Offer.objects.count(), 0)
+
+
+class ReviewTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.brand = make("revbrand", role="brand")
+        self.cr = make("revmaker", followers=9000, engagement=3)
+        self.o = Offer.objects.create(brand=self.brand.user, creator=self.cr.user, title="T", deliverables="d",
+                                      budget=5000, message="m", status="accepted")
+
+    def _login(self, name):
+        self.client.login(username=name, password="pass-12345-xyz")
+
+    def test_cannot_review_before_finished(self):
+        self._login("revbrand")
+        self.client.post(reverse("review_add", args=[self.o.pk]), {"rating": "5"})
+        self.assertEqual(Review.objects.count(), 0)
+
+    def test_finishing_counts_deals_for_both_and_unlocks_reviews(self):
+        self._login("revmaker")
+        self.client.post(reverse("offer_action", args=[self.o.pk, "complete"]))
+        self.assertEqual(Offer.objects.get().status, "completed")
+        self.assertEqual(Profile.objects.get(handle="revmaker").deals_done, 1)
+        self.assertEqual(Profile.objects.get(handle="revbrand").deals_done, 1)
+        self.assertContains(self.client.get(reverse("offer", args=[self.o.pk])), "How was it working with")
+
+    def _finish(self):
+        Offer.objects.filter(pk=self.o.pk).update(status="completed")
+
+    def test_good_review_raises_and_bad_review_lowers_rank_score(self):
+        self._finish()
+        base = Profile.objects.get(handle="revmaker").rank_score
+        self._login("revbrand")
+        self.client.post(reverse("review_add", args=[self.o.pk]), {"rating": "5", "comment": "Great work"})
+        up = Profile.objects.get(handle="revmaker")
+        self.assertGreater(up.rank_score, base)
+        self.assertEqual((up.rating_count, up.rating_avg), (1, 5))
+        self.client.post(reverse("review_add", args=[self.o.pk]), {"rating": "1", "comment": "Late"})
+        down = Profile.objects.get(handle="revmaker")
+        self.assertLess(down.rank_score, base)
+        self.assertEqual(Review.objects.count(), 1)  # a newer review replaces the old one
+
+    def test_creator_can_review_brand_and_brand_rank_moves(self):
+        self._finish()
+        base = Profile.objects.get(handle="revbrand").rank_score
+        self._login("revmaker")
+        self.client.post(reverse("review_add", args=[self.o.pk]), {"rating": "5"})
+        self.assertGreater(Profile.objects.get(handle="revbrand").rank_score, base)
+
+    def test_outsider_cannot_review(self):
+        self._finish()
+        make("rando")
+        self._login("rando")
+        r = self.client.post(reverse("review_add", args=[self.o.pk]), {"rating": "5"})
+        self.assertEqual(r.status_code, 404)
+
+    def test_reviews_show_on_profile(self):
+        self._finish()
+        self._login("revbrand")
+        self.client.post(reverse("review_add", args=[self.o.pk]), {"rating": "4", "comment": "Very professional"})
+        self.assertContains(self.client.get(reverse("creator", args=["revmaker"])), "Very professional")
+
+    def test_scores_stay_within_100(self):
+        b = make("maxbrand", role="brand", verified=True, deals_done=50, rating_avg=5, rating_count=50, city="A", address="B", bio="x", niche="food")
+        self.assertLessEqual(b.compute_score(), 100)
+
+
+import io
+import os
+import tempfile
+
+from django.core.files.uploadedfile import SimpleUploadedFile
+
+
+@override_settings(MEDIA_ROOT=tempfile.mkdtemp())
+class ShopTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.b = make("shopby", role="brand", address="CG Road", city="Ahmedabad", bio="Cafe")
+        self.client.login(username="shopby", password="pass-12345-xyz")
+
+    def _png(self, name="shop.png"):
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", (40, 30), "orange").save(buf, "PNG")
+        return SimpleUploadedFile(name, buf.getvalue(), content_type="image/png")
+
+    def test_photo_is_reencoded_as_jpeg_and_served(self):
+        self.client.post(reverse("photo_add"), {"image": self._png()})
+        ph = ShopPhoto.objects.get()
+        self.assertTrue(ph.image.name.endswith(".jpg"))
+        r = self.client.get(ph.image.url)
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r["Content-Type"], "image/jpeg")
+        b"".join(r.streaming_content)
+
+    def test_non_images_are_rejected(self):
+        self.client.post(reverse("photo_add"), {"image": SimpleUploadedFile("evil.png", b"<script>alert(1)</script>")})
+        self.assertEqual(ShopPhoto.objects.count(), 0)
+
+    def test_media_view_refuses_other_files(self):
+        self.assertEqual(self.client.get("/media/passwd").status_code, 404)
+        self.assertEqual(self.client.get("/media/nope.jpg").status_code, 404)
+
+    def test_max_six_photos(self):
+        for _ in range(7):
+            self.client.post(reverse("photo_add"), {"image": self._png()})
+        self.assertEqual(ShopPhoto.objects.count(), 6)
+
+    def test_brand_page_shows_map_photos_and_address(self):
+        self.client.post(reverse("photo_add"), {"image": self._png()})
+        page = self.client.get(reverse("creator", args=["shopby"]))
+        self.assertContains(page, "CG+Road")
+        self.assertContains(page, "google.com/maps")
+        self.assertContains(page, "shop photo 1")
+
+    def test_verification_needs_address_and_photo_first(self):
+        self.client.post(reverse("verify_request"))
+        self.assertFalse(Profile.objects.get(handle="shopby").verify_requested)
+        self.client.post(reverse("photo_add"), {"image": self._png()})
+        self.client.post(reverse("verify_request"))
+        self.assertTrue(Profile.objects.get(handle="shopby").verify_requested)
+
+    def test_brands_leaderboard_lists_brands_not_creators(self):
+        make("justcreator")
+        page = self.client.get(reverse("leaderboard") + "?kind=brands")
+        self.assertContains(page, "Shopby")
+        self.assertNotContains(page, "Justcreator")
+
+
+class HomeFeedTests(TestCase):
+    def setUp(self):
+        from .models import Campaign
+        cache.clear()
+        self.cr = make("starmaker", followers=20000, engagement=4, verified=True, bio="I make food reels", niche="food", city="Ahmedabad")
+        self.br = make("tastycafe", role="brand", bio="A cosy cafe", city="Ahmedabad")
+        Campaign.objects.create(brand=self.br.user, title="Monsoon menu launch", description="Taste and share",
+                                niche="food", city="Ahmedabad", budget=12000, deliverables="2 reels + 1 story")
+
+    def test_guest_home_loads_with_tabs_and_join_button(self):
+        r = self.client.get(reverse("home"))
+        self.assertEqual(r.status_code, 200)
+        for word in ("For you", "Creators", "Brands", "Campaigns", "Join free"):
+            self.assertContains(r, word)
+
+    def test_each_tab_shows_its_own_content(self):
+        self.assertContains(self.client.get(reverse("home") + "?feed=creators"), "Starmaker")
+        self.assertNotContains(self.client.get(reverse("home") + "?feed=creators"), "Monsoon menu launch")
+        self.assertContains(self.client.get(reverse("home") + "?feed=brands"), "Tastycafe")
+        self.assertContains(self.client.get(reverse("home") + "?feed=campaigns"), "Monsoon menu launch")
+        everything = self.client.get(reverse("home"))
+        for word in ("Starmaker", "Tastycafe", "Monsoon menu launch"):
+            self.assertContains(everything, word)
+
+    def test_bad_feed_value_falls_back_to_for_you(self):
+        self.assertEqual(self.client.get(reverse("home") + "?feed=<script>").status_code, 200)
+
+    def test_signed_in_home_has_dashboard_strip_and_plus_button(self):
+        self.client.login(username="tastycafe", password="pass-12345-xyz")
+        r = self.client.get(reverse("home"))
+        self.assertContains(r, "Dashboard")
+        self.assertContains(r, reverse("campaign_new"))  # brands get the + button for campaigns
+
+    def test_verified_uses_kite_mark_not_a_blue_tick(self):
+        for url in (reverse("home"), reverse("creator", args=["starmaker"]), reverse("leaderboard")):
+            page = self.client.get(url)
+            self.assertContains(page, "kmark")
+            self.assertNotContains(page, 'class="tick')

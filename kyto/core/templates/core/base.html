@@ -27,15 +27,33 @@
     <nav class="links" aria-label="Main">
       <a href="{% url 'leaderboard' %}"{% if u == 'leaderboard' %} class="cur"{% endif %}>Leaderboard</a>
       <a href="{% url 'campaigns' %}"{% if u == 'campaigns' or u == 'campaign' %} class="cur"{% endif %}>Campaigns</a>
+      <a href="{% url 'about' %}"{% if u == 'about' or u == 'how' %} class="cur"{% endif %}>About</a>
       {% if BOOST_ENABLED %}<a href="{% url 'boost' %}"{% if u == 'boost' %} class="cur"{% endif %}>Boost</a>{% endif %}
-      {% if user.is_authenticated %}<a href="{% url 'inbox' %}"{% if u == 'inbox' or u == 'offer' %} class="cur"{% endif %}>Inbox{% if inbox_count %}<i class="badge-n">{{ inbox_count }}</i>{% endif %}</a>{% endif %}
     </nav>
     <div class="nav-end">
       {% if user.is_authenticated %}
-        <a class="btn btn-ghost" href="{% url 'settings' %}">@{{ user.profile.handle }}</a>
-        <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="btn btn-quiet">Sign out</button></form>
+        {% if user.profile.role == "brand" %}<a class="btn btn-primary btn-sm hide-xs" href="{% url 'campaign_new' %}">+ Post campaign</a>{% endif %}
+        <a class="icon-btn" href="{% url 'inbox' %}" aria-label="Inbox{% if inbox_count %}, {{ inbox_count }} waiting{% endif %}">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>
+          {% if inbox_count %}<i class="badge-n icon-n">{{ inbox_count }}</i>{% endif %}
+        </a>
+        <details class="menu" data-menu>
+          <summary class="menu-btn" aria-label="Account menu">
+            <span class="avatar av-sm {{ user.profile.avatar_class }}" aria-hidden="true">{{ user.profile.initial }}</span>
+            <span class="menu-name">{{ user.profile.display_name|truncatechars:14 }}</span>
+            <svg class="menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+          </summary>
+          <div class="menu-pop">
+            <div class="menu-who"><b>{{ user.profile.display_name }}</b><span class="muted">@{{ user.profile.handle }} · {{ user.profile.get_role_display }}</span></div>
+            <a href="{% url 'creator' user.profile.handle %}">My public page</a>
+            <a href="{% url 'settings' %}">Dashboard &amp; settings</a>
+            <a href="{% url 'inbox' %}">Inbox{% if inbox_count %} ({{ inbox_count }}){% endif %}</a>
+            {% if user.profile.role == "brand" %}<a href="{% url 'campaign_new' %}">Post a campaign</a>{% endif %}
+            <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="menu-out">Sign out</button></form>
+          </div>
+        </details>
       {% else %}
-        <a class="btn btn-quiet" href="{% url 'login' %}">Sign in</a>
+        <a class="btn btn-ghost" href="{% url 'login' %}">Sign in</a>
         <a class="btn btn-primary" href="{% url 'signup' %}">Join free</a>
       {% endif %}
     </div>
@@ -58,19 +76,13 @@
     <div><h4>Join</h4><a href="{% url 'signup' %}">Create a free profile</a><a href="{% url 'login' %}">Sign in</a></div>
     <div><h4>Trust</h4><span>Public ranking formula</span><span>Contacts shared only with consent</span>{% if SUPPORT_WHATSAPP %}<a href="https://wa.me/{{ SUPPORT_WHATSAPP }}" rel="noopener noreferrer">WhatsApp support</a>{% endif %}</div>
   </div>
-  <div class="wrap foot-end">Rankings use numbers creators enter themselves. We mark checked profiles with a verified tick.</div>
+  <div class="wrap foot-end">Rankings use numbers creators enter themselves. We mark checked profiles with a Kite Mark.</div>
   <div class="credit">
     <span class="credit-line"></span>
     <a class="credit-in" href="{{ ZYRAC_URL }}" target="_blank" rel="noopener noreferrer" aria-label="Designed and built by Zyrac. Opens Zyrac on Instagram in a new tab.">
       <span class="credit-small">Designed &amp; built by</span>
       <span class="zyrac" aria-hidden="true"><b>Z</b><b>Y</b><b>R</b><b>A</b><b>C</b></span>
-      <span class="credit-ig" aria-hidden="true">
-        <!-- The inline width, height, fill, and stroke guarantee this never blows up -->
-        <svg viewBox="0 0 24 24" width="18" height="18" style="width: 18px; height: 18px; vertical-align: text-bottom; margin-right: 4px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;">
-          <rect x="3" y="3" width="18" height="18" rx="5"/>
-          <circle cx="12" cy="12" r="4.2"/>
-          <circle cx="17.4" cy="6.6" r="1" class="dot-ig"/>
-        </svg>@zyrac__</span>
+      <span class="credit-ig" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1" class="dot-ig"/></svg>@zyrac__</span>
     </a>
     <span class="credit-line"></span>
   </div>
@@ -78,10 +90,13 @@
 
 <nav class="tabbar" aria-label="Quick navigation">
   <a href="{% url 'home' %}"{% if u == 'home' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>Home</a>
-  <a href="{% url 'leaderboard' %}"{% if u == 'leaderboard' or u == 'creator' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><path d="M5 20V12M12 20V4M19 20v-9"/></svg>Ranks</a>
+  <a href="{% url 'leaderboard' %}"{% if u == 'leaderboard' or u == 'creator' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Explore</a>
+  {% if not user.is_authenticated %}<a class="tab-plus" href="{% url 'signup' %}" aria-label="Join free"><span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>
+  {% elif user.profile.role == "brand" %}<a class="tab-plus" href="{% url 'campaign_new' %}" aria-label="Post a campaign"><span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>
+  {% else %}<a class="tab-plus" href="{% url 'settings' %}#showcase" aria-label="Add a reel"><span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>{% endif %}
   <a href="{% url 'campaigns' %}"{% if u == 'campaigns' or u == 'campaign' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Campaigns</a>
-  {% if user.is_authenticated %}<a href="{% url 'inbox' %}"{% if u == 'inbox' or u == 'offer' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg>Inbox{% if inbox_count %}<i class="badge-n tab-n">{{ inbox_count }}</i>{% endif %}</a>{% endif %}
-  {% if user.is_authenticated %}<a href="{% url 'settings' %}"{% if u == 'settings' or u == 'password' %} class="on"{% endif %}>{% else %}<a href="{% url 'login' %}"{% if u == 'login' or u == 'signup' %} class="on"{% endif %}>{% endif %}<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>{% if user.is_authenticated %}Me{% else %}Sign in{% endif %}</a>
+  {% if user.is_authenticated %}<a href="{% url 'settings' %}"{% if u == 'settings' or u == 'password' or u == 'inbox' or u == 'offer' %} class="on"{% endif %}><span class="tab-av"><span class="avatar av-sm {{ user.profile.avatar_class }}" aria-hidden="true">{{ user.profile.initial }}</span>{% if inbox_count %}<i class="badge-n tab-n">{{ inbox_count }}</i>{% endif %}</span>Me</a>
+  {% else %}<a href="{% url 'login' %}"{% if u == 'login' or u == 'signup' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Sign in</a>{% endif %}
 </nav>
 {% endwith %}
 </body>

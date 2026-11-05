@@ -7,7 +7,7 @@
   <header class="pf-head">
     <span class="avatar avatar-xl {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
     <div class="pf-id">
-      <h1>{{ p.display_name }}{% if p.verified %}<svg class="tick tick-lg" viewBox="0 0 20 20" aria-label="Verified"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.3l2.6 2.6 5.4-5.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endif %}</h1>
+      <h1>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" with big=1 %}{% endif %}</h1>
       <p class="muted">@{{ p.handle }}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</p>
     </div>
     <div class="pf-actions">
@@ -53,9 +53,11 @@
           <li><span>{{ label }}</span><progress max="{{ mx }}" value="{{ v|stringformat:'.2f' }}" data-anim></progress><b>{{ v|floatformat:1 }}<small>/{{ mx }}</small></b></li>
           {% endfor %}
         </ul>
-        <p class="fine">Follower and engagement numbers are self-reported. The verified tick means we checked them.</p>
+        <p class="fine">Follower and engagement numbers are self-reported. The Kite Mark means we checked them.</p>
       </section>
       {% endif %}
+
+      {% include "core/_reviews.html" %}
 
       {% if similar %}
       <section aria-labelledby="sim-h">
@@ -90,6 +92,8 @@
           <div><dt>Engaged people per post</dt><dd>~{{ p.engaged_per_post|compact }}</dd></div>
           {% if p.rate_per_post %}<div><dt>Rate per post</dt><dd>{{ p.rate_per_post|rupees }}</dd></div>
           {% elif rate %}<div><dt>Fair rate estimate</dt><dd>{{ rate.0|rupees }}–{{ rate.1|rupees }}</dd></div>{% endif %}
+          {% if p.rating_count %}<div><dt>Brand rating</dt><dd>★ {{ p.rating_avg|floatformat:1 }}</dd></div>{% endif %}
+          {% if p.deals_done %}<div><dt>Jobs finished</dt><dd>{{ p.deals_done }}</dd></div>{% endif %}
           {% if p.views >= 10 %}<div><dt>Profile views</dt><dd>{{ p.views|compact }}</dd></div>{% endif %}
         </dl>
       </section>

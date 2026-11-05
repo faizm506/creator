@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from django.db import transaction
 
+from .utils import process_image
+
 from .models import Offer, Application, BoostRequest, Campaign, Profile, ShowcasePost
 
 User = get_user_model()
@@ -67,13 +69,14 @@ class SignupForm(UserCreationForm):
 class ProfileForm(forms.ModelForm):
     class Meta:
         model = Profile
-        fields = ["display_name", "niche", "city", "bio", "followers", "engagement",
+        fields = ["display_name", "niche", "city", "address", "bio", "followers", "engagement",
                   "rate_per_post", "whatsapp", "show_contact"]
         widgets = {"bio": forms.Textarea(attrs={"rows": 3, "maxlength": 280, "placeholder": "Tell brands what you create and who follows you."})}
-        labels = {"display_name": "Your name", "bio": "About you", "city": "City", "niche": "What do you post about?",
+        labels = {"display_name": "Your name", "bio": "About you", "city": "City", "address": "Shop address", "niche": "What do you post about?",
                   "followers": "Instagram followers", "rate_per_post": "Your price per post (₹)",
                   "whatsapp": "WhatsApp number", "show_contact": "Let any signed-in member see my WhatsApp"}
         help_texts = {
+            "address": "Full address so creators can find you on the map. Only add it if people can visit.",
             "city": "Used for city rankings. Type it the way brands search, like Ahmedabad.",
             "bio": "Up to 280 characters.",
             "followers": "Your current follower count on Instagram.",
@@ -88,6 +91,13 @@ class ProfileForm(forms.ModelForm):
         if self.instance.role == Profile.BRAND:
             for f in ("followers", "engagement", "rate_per_post"):
                 del self.fields[f]
+            self.fields["display_name"].label = "Brand name"
+            self.fields["bio"].label = "About your shop"
+            self.fields["bio"].widget.attrs["placeholder"] = "What do you sell, and what makes your shop special?"
+            self.fields["niche"].label = "Type of business"
+            self.fields["niche"].help_text = "Helps creators in that niche find you."
+        else:
+            del self.fields["address"]
         self.fields["niche"].required = False
 
 
@@ -163,8 +173,11 @@ class OfferForm(forms.ModelForm):
             "deliverables": forms.TextInput(attrs={"placeholder": "e.g. 1 reel + 2 stories"}),
         }
 
-    def __init__(self, *args, brand=None, **kwargs):
+    def __init__(self, *args, brand=None, by_creator=False, **kwargs):
         super().__init__(*args, **kwargs)
+        if by_creator:
+            self.fields["budget"].label = "Your price (₹)"
+            self.fields["message"].widget.attrs["placeholder"] = "Say hello, and share why you're a good fit."
         self.fields["campaign"].queryset = Campaign.objects.filter(brand=brand, is_open=True)
         self.fields["campaign"].required = False
         self.fields["campaign"].empty_label = "Not linked to a campaign"
@@ -175,3 +188,34 @@ class OfferForm(forms.ModelForm):
         if b < 500:
             raise forms.ValidationError("Offers start at ₹500.")
         return b
+
+
+class ProposalForm(forms.ModelForm):
+    """A creator's proposal on a campaign: their own price and a short message."""
+    class Meta:
+        model = Offer
+        fields = ["budget", "message"]
+        labels = {"budget": "Your price (₹)", "message": "Your message to the brand"}
+        help_texts = {"budget": "What you'd like to be paid for this work."}
+        widgets = {"message": forms.Textarea(attrs={"rows": 4, "maxlength": 1000,
+                   "placeholder": "Say hello, share why you're a good fit, and mention a reel you're proud of."})}
+
+    def clean_budget(self):
+        b = self.cleaned_data["budget"]
+        if b < 500:
+            raise forms.ValidationError("Proposals start at ₹500.")
+        return b
+
+
+class ReviewForm(forms.Form):
+    rating = forms.TypedChoiceField(choices=[(i, str(i)) for i in range(5, 0, -1)], coerce=int,
+                                    error_messages={"required": "Tap a star to rate.", "invalid_choice": "Tap a star to rate."})
+    comment = forms.CharField(max_length=400, required=False, label="Tell others how it went",
+                              widget=forms.Textarea(attrs={"rows": 3, "maxlength": 400, "placeholder": "Was it easy to work together? Optional."}))
+
+
+class PhotoForm(forms.Form):
+    image = forms.FileField(label="Shop photo")
+
+    def clean_image(self):
+        return process_image(self.cleaned_data["image"])

@@ -312,3 +312,57 @@
     });
   }
 })();
+
+(function () {
+  "use strict";
+
+  /* Account menu closes when you tap elsewhere or press Escape */
+  var menu = document.querySelector("[data-menu]");
+  if (menu) {
+    document.addEventListener("click", function (e) { if (menu.open && !menu.contains(e.target)) menu.open = false; });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") menu.open = false; });
+  }
+
+  /* Google Map loads only when tapped (faster page, nothing sent to Google until you ask) */
+  document.querySelectorAll("[data-map]").forEach(function (box) {
+    var btn = box.querySelector(".map-face");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      var src = box.dataset.embed || "";
+      if (src.indexOf("https://www.google.com/maps") !== 0) return;
+      var f = document.createElement("iframe");
+      f.src = src; f.loading = "lazy"; f.title = "Map of the shop";
+      f.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
+      f.setAttribute("sandbox", "allow-scripts allow-same-origin allow-popups");
+      btn.replaceWith(f);
+    });
+  });
+
+  /* Tap a shop photo to see it big */
+  var lb = document.querySelector("[data-lightbox]");
+  if (lb && typeof lb.showModal === "function") {
+    var big = lb.querySelector("img");
+    document.querySelectorAll(".shot").forEach(function (s) {
+      s.addEventListener("click", function () { big.src = s.dataset.full; lb.showModal(); });
+    });
+    lb.querySelector(".lb-close").addEventListener("click", function () { lb.close(); });
+    lb.addEventListener("click", function (e) { if (e.target === lb) lb.close(); });
+  }
+})();
+
+(function () {
+  "use strict";
+  /* Share: opens the phone's share sheet when it exists, otherwise copies the link */
+  document.querySelectorAll("[data-share]").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var url = new URL(b.dataset.share, window.location.origin).href, title = b.dataset.title || document.title;
+      if (navigator.share) { navigator.share({ title: title, url: url }).catch(function () {}); return; }
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(function () {
+          var l = b.querySelector("span"), old = l ? l.textContent : "";
+          if (l) { l.textContent = "Copied!"; setTimeout(function () { l.textContent = old; }, 1600); }
+        });
+      }
+    });
+  });
+})();

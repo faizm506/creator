@@ -6,7 +6,7 @@ Built by [Zyrac](https://www.instagram.com/zyrac__/).
 ## Run in GitHub Codespaces
 1. Upload this folder to a new GitHub repo, then Code → Codespaces → Create codespace.
 2. Setup installs packages, creates the database and loads demo creators.
-3. Open `.env` and paste your own `SECRET_KEY` (generate one below). Set `ADMIN_URL` to a private path.
+3. Open `.env`. Keep `DEBUG=True` while developing (without it the site forces HTTPS and shows no CSS). Paste your own `SECRET_KEY` (generate one below). Set `ADMIN_URL` to a private path.
 4. `python manage.py createsuperuser`
 5. `python manage.py runserver 0.0.0.0:8000`, then open port 8000.
 6. `python manage.py test` runs the test suite.
@@ -20,6 +20,7 @@ Changing the key signs everyone out, so keep one key for the life of the site.
 
 ## Upgrading from an older copy
 ```bash
+pip install -r requirements.txt   # adds Pillow for shop photos
 python manage.py makemigrations core
 python manage.py migrate
 python manage.py recompute_scores
@@ -43,3 +44,8 @@ Hashed passwords (10+ characters), CSRF on every form, HttpOnly + SameSite cooki
 clickjacking protection, per-account and per-IP sign-in lockout, throttled sign-up/reset/admin login/offers/messages,
 owner-only access to offers and messages, contact details shared only after acceptance, Instagram embeds sandboxed
 and loaded only when tapped, fixed-destination Instagram redirect (no open redirect), account deletion with password check.
+
+## Shop photos
+Brands upload up to 6 photos. They are checked, resized and re-saved as clean JPEGs into the `media/` folder
+(never served as anything else). On a host with a temporary disk (Render free, Heroku) uploads disappear on restart:
+attach a persistent disk, or move `MEDIA_ROOT` to object storage, before you go live.

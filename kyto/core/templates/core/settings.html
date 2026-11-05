@@ -20,7 +20,8 @@
     <nav class="st-nav" aria-label="Settings sections">
       <a href="#overview" class="on">Overview</a>
       <a href="#profile">Profile</a>
-      {% if p.is_creator %}<a href="#showcase">Showcase</a>{% endif %}
+      {% if p.is_creator %}<a href="#showcase">Reels</a>{% else %}<a href="#shop">Shop photos</a>{% endif %}
+      <a href="#verify">Verification</a>
       <a href="#security">Security</a>
       {% if p.is_creator and BOOST_ENABLED %}<a href="#boost">Boost</a>{% endif %}
     </nav>
@@ -28,33 +29,28 @@
     <div class="st-body">
       <section id="overview" class="st-sec">
         <h2>Overview</h2>
-        {% if p.is_creator %}
         <div class="kpis">
-          <div><b>#{{ info.overall }}</b><span>Overall rank</span></div>
-          <div><b>{% if info.city %}#{{ info.city }}{% else %}–{% endif %}</b><span>In your city</span></div>
-          <div><b>{{ p.views }}</b><span>Profile views</span></div>
-          <div><b>{{ p.ig_clicks }}</b><span>Instagram visits sent</span></div>
+          <div><b>#{{ info.overall }}</b><span>Rank among {% if p.is_brand %}brands{% else %}creators{% endif %}</span></div>
+          <div><b>{% if p.rating_count %}★ {{ p.rating_avg|floatformat:1 }}{% else %}–{% endif %}</b><span>{% if p.rating_count %}{{ p.rating_count }} review{{ p.rating_count|pluralize }}{% else %}No reviews yet{% endif %}</span></div>
+          <div><b>{{ p.views }}</b><span>Page views</span></div>
+          <div><b>{% if p.is_brand %}{{ stats.campaigns }}{% else %}{{ p.ig_clicks }}{% endif %}</b><span>{% if p.is_brand %}Open campaigns{% else %}Instagram visits sent{% endif %}</span></div>
         </div>
         <a class="inbox-card" href="{% url 'inbox' %}">
-          <div><b>{{ stats.waiting }} offer{{ stats.waiting|pluralize }} waiting</b><span>{{ stats.hired }} brand{{ stats.hired|pluralize }} hired you so far</span></div><span class="chev">›</span>
+          <div><b>{{ stats.waiting }} waiting for your answer</b><span>{{ stats.hired }} deal{{ stats.hired|pluralize }} so far · open your inbox</span></div><span class="chev">›</span>
         </a>
         <div class="summary">
           <div><span class="muted">Score</span><b>{{ p.rank_score }}</b></div>
-          <div class="grow"><span class="muted">Top {{ info.top_pct }}% of {{ info.total }} creators</span>
+          <div class="grow"><span class="muted">Top {{ info.top_pct }}% of {{ info.total }} {% if p.is_brand %}brands{% else %}creators{% endif %}</span>
             <progress max="100" value="{{ p.rank_score|stringformat:'.1f' }}" data-anim></progress></div>
         </div>
         {% if steps %}
         <div class="todo"><h3>Your next steps</h3>
           <ul>{% for text, pts in steps %}<li><span>{{ text }}</span><b>+{{ pts }}</b></li>{% endfor %}</ul></div>
-        {% else %}<p class="notice">Your profile is fully built. Keep your numbers up to date to hold your rank.</p>{% endif %}
-        {% else %}
-        <div class="kpis kpis-3">
-          <div><b>{{ stats.sent }}</b><span>Offers sent</span></div>
-          <div><b>{{ stats.hired }}</b><span>Creators hired</span></div>
-          <div><b>{{ stats.campaigns }}</b><span>Open campaigns</span></div>
-        </div>
-        <a class="inbox-card" href="{% url 'inbox' %}"><div><b>Open your inbox</b><span>Replies from creators appear here</span></div><span class="chev">›</span></a>
-        <div class="cta"><a class="btn btn-primary" href="{% url 'leaderboard' %}">Find creators</a><a class="btn btn-ghost" href="{% url 'campaign_new' %}">Post a campaign</a></div>
+        {% else %}<p class="notice">Your page is fully built. Keep it up to date and reply to offers quickly to hold your rank.</p>{% endif %}
+        {% if p.is_brand %}<div class="cta"><a class="btn btn-primary" href="{% url 'campaign_new' %}">Post a campaign</a><a class="btn btn-ghost" href="{% url 'leaderboard' %}">Find creators</a></div>{% endif %}
+        {% if reviews %}
+        <div class="todo"><h3>Latest reviews about you</h3>
+          <ul>{% for r in reviews %}<li><span><span class="stars">{{ r.rating|stars }}</span> {{ r.author.profile.display_name }}{% if r.comment %} <span class="muted">“{{ r.comment|truncatechars:60 }}”</span>{% endif %}</span></li>{% endfor %}</ul></div>
         {% endif %}
       </section>
 
@@ -66,7 +62,7 @@
           {% for field in form %}{% include "core/_field.html" %}{% endfor %}
           <button class="btn btn-primary btn-block">Save changes</button>
         </form>
-        <p class="fine">Follower count and engagement are self-reported. Ask us for the verified tick to earn 5 bonus points.</p>
+        <p class="fine">Follower count and engagement are self-reported. Ask us for the Kite Mark to earn 5 bonus points.</p>
       </section>
 
       {% if p.is_creator %}
@@ -92,6 +88,44 @@
         </div>
       </section>
       {% endif %}
+
+      {% if p.is_brand %}
+      <section id="shop" class="st-sec">
+        <h2>Shop photos</h2>
+        <div class="group">
+          <p class="fine fine-top">Show creators your shop. Up to 6 photos ({{ photos|length }} used). We resize them and remove hidden data for safety.</p>
+          {% if photos %}
+          <div class="thumbs">
+            {% for ph in photos %}
+            <figure class="thumb"><img src="{{ ph.image.url }}" alt="Shop photo {{ forloop.counter }}" loading="lazy">
+              <form method="post" action="{% url 'photo_remove' ph.pk %}" data-confirm="Remove this photo?">{% csrf_token %}<button class="thumb-x" aria-label="Remove photo {{ forloop.counter }}">✕</button></form></figure>
+            {% endfor %}
+          </div>
+          {% endif %}
+          <form method="post" action="{% url 'photo_add' %}" enctype="multipart/form-data" class="sc-add">
+            {% csrf_token %}
+            <input type="file" name="image" accept="image/*" aria-label="Choose a shop photo" required>
+            <button class="btn btn-primary">Upload</button>
+          </form>
+          <p class="fine">Add your address in Profile above, and your shop appears on a Google map on your page.</p>
+        </div>
+      </section>
+      {% endif %}
+
+      <section id="verify" class="st-sec">
+        <h2>Verification</h2>
+        {% if p.verified %}
+        <div class="verify-card ok"><span class="kmark kmark-xl" aria-hidden="true"></span>
+          <div><b>You're verified{% if p.verified_at %} since {{ p.verified_at|date:"j M Y" }}{% endif %}</b><span>Everyone sees the Kite Mark on your page and in rankings.</span></div></div>
+        {% elif p.verify_requested %}
+        <div class="verify-card wait"><div><b>Request received</b><span>We're checking your {% if p.is_brand %}shop{% else %}profile{% endif %}. You'll see the Kite Mark here once it's done.</span></div></div>
+        {% else %}
+        <div class="verify-card">
+          <div><b>Get your Kite Mark</b><span>{% if p.is_brand %}We check that your shop is real, using your address and photos. Verified shops are trusted more by creators and earn 20 score points.{% else %}We check that your Instagram and numbers are real. Verified creators earn 5 score points and more trust from brands.{% endif %}</span></div>
+          <form method="post" action="{% url 'verify_request' %}">{% csrf_token %}<button class="btn btn-primary">Request verification</button></form>
+        </div>
+        {% endif %}
+      </section>
 
       <section id="security" class="st-sec">
         <h2>Security</h2>

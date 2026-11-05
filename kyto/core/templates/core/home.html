@@ -1,96 +1,71 @@
 {% extends "core/base.html" %}
 {% load core_extras %}
 {% block content %}
-<section class="hero wrap">
-  <div class="hero-copy">
-    <h1>Get found by the brands in your city.</h1>
-    <p class="lead">Build a free profile, climb the leaderboard and get hired directly by Ahmedabad brands.</p>
-    <form class="hero-search" action="{% url 'leaderboard' %}" method="get" role="search">
-      <input type="search" name="q" placeholder="Search a creator or handle" aria-label="Search creators">
-      <input type="hidden" name="city" value="Ahmedabad">
-      <button class="btn btn-primary">Search</button>
-    </form>
-    <div class="chips" aria-label="Browse by niche">
-      {% for k, label in niches|slice:":6" %}<a class="chip" href="{% url 'leaderboard' %}?city=Ahmedabad&amp;niche={{ k }}">{{ label }}</a>{% endfor %}
+<div class="wrap home-grid">
+  <div class="feed-col">
+    <h1 class="sr">{{ SITE_NAME }}: {{ TAGLINE }}</h1>
+
+    <div class="stories" aria-label="Top creators and brands">
+      {% if user.is_authenticated %}
+      <a class="story" href="{% url 'settings' %}"><span class="ring mine"><span class="avatar {{ me.avatar_class }}">{{ me.initial }}</span><i class="plus-dot" aria-hidden="true">+</i></span><span class="story-name">Your page</span></a>
+      {% else %}
+      <a class="story" href="{% url 'signup' %}"><span class="ring mine"><span class="avatar av-join">+</span></span><span class="story-name">Join free</span></a>
+      {% endif %}
+      {% for p in stories %}
+      <a class="story" href="{% url 'creator' p.handle %}"><span class="ring{% if p.is_brand %} brand{% endif %}{% if p.verified %} vr{% endif %}"><span class="avatar {{ p.avatar_class }}">{{ p.initial }}</span>{% if p.verified %}{% include "core/_kmark.html" %}{% endif %}</span><span class="story-name">{{ p.display_name }}</span></a>
+      {% endfor %}
     </div>
-    <div class="cta">
-      <a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join free</a>
-      <a class="btn btn-ghost btn-lg" href="{% url 'about' %}">How it works</a>
+
+    <div class="stories hls" aria-label="Browse by niche">
+      {% for k, label in niches %}
+      <a class="story" href="{% url 'leaderboard' %}?niche={{ k }}"><span class="hl-circle">{{ label|slice:":1" }}</span><span class="story-name">{{ label }}</span></a>
+      {% endfor %}
     </div>
-  </div>
-  {% include "core/_scene.html" %}
-</section>
 
-<section class="wrap statband" aria-label="Network at a glance">
-  <div><b data-count="{{ stats.creators }}">{{ stats.creators }}</b><span>Creators</span></div>
-  <div><b data-count="{{ stats.brands }}">{{ stats.brands }}</b><span>Brands</span></div>
-  <div><b data-count="{{ stats.campaigns }}">{{ stats.campaigns }}</b><span>Open campaigns</span></div>
-  <div><b data-count="{{ stats.reach }}" data-format="compact">{{ stats.reach|compact }}</b><span>Combined followers</span></div>
-</section>
-
-{% if featured %}
-<section class="wrap shelf">
-  <div class="sec-head"><h2>Featured creators</h2></div>
-  <div class="rows rows-featured" data-rows>{% for p in featured %}{% include "core/_row.html" %}{% endfor %}</div>
-</section>
-{% endif %}
-
-<section class="wrap steps-sec">
-  <h2>Three simple steps.</h2>
-  <ol class="steps">
-    <li><span class="num">1</span><h3>Make your page</h3><p>Add your details and your best reels. It takes five minutes.</p></li>
-    <li><span class="num">2</span><h3>Get ranked</h3><p>You get a score and a place on the leaderboard. The rules are public.</p></li>
-    <li><span class="num">3</span><h3>Get hired</h3><p>Brands send offers straight to you. Chat, agree, and get to work.</p></li>
-  </ol>
-</section>
-
-<section class="wrap champs-sec">
-  <h2>Who's number one in each niche?</h2>
-  <p class="lead-s">Every niche has a crown. Take it by climbing the leaderboard.</p>
-  <div class="champs">
-    {% for k, label, p in champions %}
-    {% if p %}
-    <a class="champ" href="{% url 'leaderboard' %}?niche={{ k }}">
-      <span class="champ-niche">{{ label }}</span>
-      <span class="avatar {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
-      <strong>{{ p.display_name }}</strong>
-      <span class="muted">@{{ p.handle }}</span>
-      <span class="score">{{ p.rank_score }}</span>
-      <svg class="crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 10H5z"/></svg>
+    {% if me %}
+    <a class="mystrip" href="{% url 'settings' %}">
+      <span class="avatar {{ me.avatar_class }}" aria-hidden="true">{{ me.initial }}</span>
+      <span class="mystrip-text"><b>Hi, {{ me.display_name|truncatechars:20 }}</b><span class="muted">Rank #{{ my_info.overall }} of {{ my_info.total }} {% if me.is_brand %}brands{% else %}creators{% endif %}{% if inbox_count %} · {{ inbox_count }} waiting{% endif %}</span></span>
+      <span class="mystrip-go">Dashboard ›</span>
     </a>
     {% else %}
-    <a class="champ open" href="{% url 'signup' %}">
-      <span class="champ-niche">{{ label }}</span>
-      <span class="avatar-ghost" aria-hidden="true">?</span>
-      <strong>Unclaimed</strong>
-      <span class="muted">Be the first {{ label|lower }} creator</span>
-    </a>
+    <section class="welcome">
+      <h2>Get found by the brands in your city.</h2>
+      <p>Free profiles, a public leaderboard, direct offers and chat.</p>
+      <div class="welcome-btns"><a class="btn btn-lg btn-light" href="{% url 'signup' %}">Join free</a><a class="btn btn-lg btn-clear" href="{% url 'login' %}">Sign in</a></div>
+    </section>
     {% endif %}
+
+    <nav class="ftabs" aria-label="Feed">
+      <a href="?feed=all"{% if feed == 'all' %} class="on" aria-current="page"{% endif %}>For you</a>
+      <a href="?feed=creators"{% if feed == 'creators' %} class="on" aria-current="page"{% endif %}>Creators</a>
+      <a href="?feed=brands"{% if feed == 'brands' %} class="on" aria-current="page"{% endif %}>Brands</a>
+      <a href="?feed=campaigns"{% if feed == 'campaigns' %} class="on" aria-current="page"{% endif %}>Campaigns</a>
+    </nav>
+
+    {% for item in items %}{% include "core/_feed_card.html" %}
+    {% empty %}
+    <div class="empty empty-card"><h3>Nothing here yet.</h3><p>Be the first to join and appear in the feed.</p><a class="btn btn-primary" href="{% url 'signup' %}">Join free</a></div>
     {% endfor %}
-  </div>
-</section>
 
-{% if top %}
-<section class="wrap">
-  <div class="sec-head"><h2>Top creators right now</h2><a class="link" href="{% url 'leaderboard' %}">View all</a></div>
-  <div class="rows" data-rows>
-    {% for p in top %}{% include "core/_row.html" with rank=forloop.counter %}{% endfor %}
+    <p class="feed-end">
+      {% if feed == "campaigns" %}<a class="btn btn-ghost" href="{% url 'campaigns' %}">See all campaigns</a>
+      {% elif feed == "brands" %}<a class="btn btn-ghost" href="{% url 'leaderboard' %}?kind=brands">See all brands</a>
+      {% else %}<a class="btn btn-ghost" href="{% url 'leaderboard' %}">Open the full leaderboard</a>{% endif %}
+    </p>
   </div>
-</section>
-{% endif %}
 
-{% if rising %}
-<section class="wrap shelf">
-  <div class="sec-head"><h2>Rising stars</h2><span class="muted">New this month</span></div>
-  <div class="rows" data-rows>{% for p in rising %}{% include "core/_row.html" %}{% endfor %}</div>
-</section>
-{% endif %}
-
-<section class="wrap launch-band">
-  <div>
-    <h2>Free while we launch.</h2>
-    <p class="lead-s">Profiles, rankings, reels and offers cost nothing. Join early and claim your spot.</p>
-  </div>
-  <a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join free</a>
-</section>
+  <aside class="rail" aria-label="Suggestions">
+    {% if me %}
+    <a class="rail-me" href="{% url 'settings' %}"><span class="avatar {{ me.avatar_class }}" aria-hidden="true">{{ me.initial }}</span><span><b>{{ me.handle }}</b><span class="muted">{{ me.display_name }}</span></span></a>
+    {% else %}
+    <div class="rail-join"><b>New to {{ SITE_NAME }}?</b><span>Make a free page and get hired.</span><a class="btn btn-primary" href="{% url 'signup' %}">Join free</a></div>
+    {% endif %}
+    <div class="rail-box"><div class="rail-head"><b>Top creators</b><a href="{% url 'leaderboard' %}">See all</a></div>
+      {% for p in rail_creators %}<a class="rail-row" href="{% url 'creator' p.handle %}"><span class="ring ring-xs{% if p.verified %} vr{% endif %}"><span class="avatar {{ p.avatar_class }}">{{ p.initial }}</span></span><span class="rr-main"><b>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" %}{% endif %}</b><span class="muted">#{{ forloop.counter }} · {{ p.followers|compact }} followers</span></span><span class="score">{{ p.rank_score }}</span></a>{% endfor %}</div>
+    {% if rail_brands %}<div class="rail-box"><div class="rail-head"><b>Top brands</b><a href="{% url 'leaderboard' %}?kind=brands">See all</a></div>
+      {% for p in rail_brands %}<a class="rail-row" href="{% url 'creator' p.handle %}"><span class="ring ring-xs brand{% if p.verified %} vr{% endif %}"><span class="avatar {{ p.avatar_class }}">{{ p.initial }}</span></span><span class="rr-main"><b>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" %}{% endif %}</b><span class="muted">{% if p.rating_count %}★ {{ p.rating_avg|floatformat:1 }}{% else %}New{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</span></span><span class="score">{{ p.rank_score }}</span></a>{% endfor %}</div>{% endif %}
+    <p class="rail-foot"><a href="{% url 'about' %}">About</a> · <a href="{% url 'how' %}">How ranking works</a> · <a href="{% url 'campaigns' %}">Campaigns</a></p>
+  </aside>
+</div>
 {% endblock %}

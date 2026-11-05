@@ -3,11 +3,15 @@
   <span class="row-rank r{{ rank }}">{% if rank %}{{ rank }}{% endif %}</span>
   <span class="avatar {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
   <span class="row-main">
-    <strong>{{ p.display_name }}{% if p.verified %}<svg class="tick" viewBox="0 0 20 20" aria-label="Verified"><circle cx="10" cy="10" r="10"/><path d="M5.8 10.3l2.6 2.6 5.4-5.6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>{% endif %}</strong>
+    <strong>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" %}{% endif %}</strong>
     <span class="muted">@{{ p.handle }}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</span>
   </span>
+  {% if p.role == "brand" %}
+  <span class="row-stat"><b>{% if p.rating_count %}★ {{ p.rating_avg|floatformat:1 }}{% else %}New{% endif %}</b><span class="muted">{% if p.rating_count %}{{ p.rating_count }} review{{ p.rating_count|pluralize }}{% else %}no reviews{% endif %}</span></span>
+  {% else %}
   <span class="row-stat"><b>{{ p.followers|compact }}</b><span class="muted">followers</span></span>
-  <span class="row-stat"><b>{{ p.engagement }}%</b><span class="muted">engagement</span></span>
+  <span class="row-stat"><b>{% if p.rating_count %}★ {{ p.rating_avg|floatformat:1 }}{% else %}{{ p.engagement }}%{% endif %}</b><span class="muted">{% if p.rating_count %}{{ p.rating_count }} review{{ p.rating_count|pluralize }}{% else %}engagement{% endif %}</span></span>
+  {% endif %}
   {% if p.is_boosted %}<span class="pill pill-boost">Featured</span>{% endif %}
   <span class="score">{{ p.rank_score }}</span>
 </a>

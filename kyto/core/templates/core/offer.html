@@ -10,7 +10,7 @@
       <section class="panel who-card">
         <span class="avatar avatar-lg {{ other.avatar_class }}" aria-hidden="true">{{ other.initial }}</span>
         <div>
-          <p class="muted">{% if is_brand %}Your offer to{% else %}Offer from{% endif %}</p>
+          <p class="muted">{% if is_init %}Your {% if o.initiator == "creator" %}proposal to{% else %}offer to{% endif %}{% else %}{% if o.initiator == "creator" %}Proposal from{% else %}Offer from{% endif %}{% endif %}</p>
           <h1><a href="{% url 'creator' other.handle %}">{{ other.display_name }}</a></h1>
         </div>
         <span class="pill pill-{{ o.status }}">{{ o.get_status_display }}</span>
@@ -28,10 +28,10 @@
         </ol>
       </section>
 
-      {% if o.status == 'pending' and not is_brand %}
+      {% if o.status == 'pending' and not is_init %}
       <section class="decide">
-        <h3>Do you want this job?</h3>
-        <p>If you accept, you and the brand can see each other's WhatsApp number{% if not user.profile.whatsapp %}. You haven't added yours yet, so <a href="{% url 'settings' %}#profile">add it first</a>{% endif %}.</p>
+        <h3>{% if is_brand %}Accept this proposal?{% else %}Do you want this job?{% endif %}</h3>
+        <p>If you accept, you and {{ other.display_name }} can see each other's WhatsApp number{% if not user.profile.whatsapp %}. You haven't added yours yet, so <a href="{% url 'settings' %}#profile">add it first</a>{% endif %}. You can chat before deciding.</p>
         <div class="decide-btns">
           <form method="post" action="{% url 'offer_action' o.pk 'accept' %}">{% csrf_token %}<button class="btn btn-primary btn-lg">Accept</button></form>
           <form method="post" action="{% url 'offer_action' o.pk 'decline' %}" data-confirm="Decline this offer?">{% csrf_token %}<button class="btn btn-ghost btn-lg">Not now</button></form>
@@ -45,8 +45,8 @@
       {% elif o.status == 'accepted' %}<p class="notice">{{ other.display_name }} hasn't added a WhatsApp number yet. Keep chatting here.</p>{% endif %}
 
       <div class="side-acts">
-        {% if o.status == 'pending' and is_brand %}<form method="post" action="{% url 'offer_action' o.pk 'withdraw' %}" data-confirm="Withdraw this offer?">{% csrf_token %}<button class="btn btn-quiet">Withdraw offer</button></form>{% endif %}
-        {% if o.status == 'accepted' and is_brand %}<form method="post" action="{% url 'offer_action' o.pk 'complete' %}" data-confirm="Mark this work as finished?">{% csrf_token %}<button class="btn btn-ghost btn-block">Mark work as finished</button></form>{% endif %}
+        {% if o.status == 'pending' and is_init %}<form method="post" action="{% url 'offer_action' o.pk 'withdraw' %}" data-confirm="Withdraw this?">{% csrf_token %}<button class="btn btn-quiet">Withdraw</button></form>{% endif %}
+        {% if o.status == 'accepted' %}<form method="post" action="{% url 'offer_action' o.pk 'complete' %}" data-confirm="Mark this work as finished?">{% csrf_token %}<button class="btn btn-ghost btn-block">Mark work as finished</button></form>{% endif %}
       </div>
     </aside>
 
@@ -59,7 +59,7 @@
         {% for m in thread %}
         {% ifchanged m.at|date:"Y-m-d" %}<div class="day">{{ m.at|date:"j F" }}</div>{% endifchanged %}
         <div class="bubble {% if m.mine %}me{% else %}them{% endif %}">
-          {% if m.first %}<small class="tagline">Original offer</small>{% endif %}
+          {% if m.first %}<small class="tagline">{% if o.initiator == "creator" %}Original proposal{% else %}Original offer{% endif %}</small>{% endif %}
           <p>{{ m.body|linebreaksbr }}</p><time>{{ m.at|date:"g:i a" }}</time>
         </div>
         {% endfor %}
@@ -69,7 +69,7 @@
       {% if o.is_open %}
       <div class="quick" aria-label="Quick replies">
         {% if o.status == 'pending' %}
-          {% if is_brand %}<button type="button" class="chip" data-quick="Thanks for looking at this! Happy to answer any questions.">Happy to answer questions</button>
+          {% if is_init %}<button type="button" class="chip" data-quick="Thanks for looking at this! Happy to answer any questions.">Happy to answer questions</button>
           {% else %}<button type="button" class="chip" data-quick="Thanks, I'm interested! Can you share more details?">I'm interested</button><button type="button" class="chip" data-quick="What is the timeline for this?">What's the timeline?</button><button type="button" class="chip" data-quick="Could we talk about the budget?">Talk about budget</button>{% endif %}
         {% else %}
           <button type="button" class="chip" data-quick="Sounds good!">Sounds good!</button><button type="button" class="chip" data-quick="When would you like to start?">When do we start?</button><button type="button" class="chip" data-quick="Thank you!">Thank you!</button>
@@ -83,6 +83,19 @@
       {% else %}<p class="chat-closed">This offer is closed, so the chat is read-only.</p>{% endif %}
     </div>
   </div>
+  {% if o.status == 'completed' %}
+  <section class="panel review-card" id="review">
+    <h2>How was it working with {{ other.display_name }}?</h2>
+    {% if their_review %}<p class="fine fine-top">{{ other.display_name }} rated you <span class="stars">{{ their_review.rating|stars }}</span>.</p>{% endif %}
+    {% if my_review %}
+    <p class="notice done-note">Your review: <span class="stars">{{ my_review.rating|stars }}</span>{% if my_review.comment %} “{{ my_review.comment }}”{% endif %}</p>
+    <details class="edit-review"><summary>Change my review</summary>{% include "core/_review_form.html" with label="Update review" %}</details>
+    {% else %}
+    <p class="fine fine-top">Your honest review helps others and moves {{ other.display_name }} up or down the leaderboard.</p>
+    {% include "core/_review_form.html" with label="Post review" %}
+    {% endif %}
+  </section>
+  {% endif %}
   <p class="fine center">Agree payment directly with each other. {{ SITE_NAME }} never asks you to pay.</p>
 </section>
 {% endblock %}

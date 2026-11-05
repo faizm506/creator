@@ -59,3 +59,31 @@ def qr_svg(data):
     buf = io.BytesIO()
     img.save(buf)
     return mark_safe(buf.getvalue().decode())
+
+
+MAX_UPLOAD = 4 * 1024 * 1024
+
+
+def process_image(f, max_side=1400):
+    """Validate an uploaded photo and re-encode it as a clean JPEG (strips metadata and any hidden payload)."""
+    from io import BytesIO
+    from uuid import uuid4
+
+    from django.core.exceptions import ValidationError
+    from django.core.files.base import ContentFile
+    from PIL import Image, ImageOps
+
+    Image.MAX_IMAGE_PIXELS = 30_000_000
+    if f.size > MAX_UPLOAD:
+        raise ValidationError("That photo is too big. Please use one under 4 MB.")
+    try:
+        img = Image.open(f)
+        img.verify()
+        f.seek(0)
+        img = ImageOps.exif_transpose(Image.open(f)).convert("RGB")
+    except Exception:
+        raise ValidationError("We couldn't read that file as a photo. Try a JPG or PNG.")
+    img.thumbnail((max_side, max_side))
+    buf = BytesIO()
+    img.save(buf, "JPEG", quality=82, optimize=True)
+    return ContentFile(buf.getvalue(), name=f"{uuid4().hex}.jpg")

@@ -1,0 +1,99 @@
+{% extends "core/base.html" %}
+{% load core_extras %}
+{% block title %}{{ p.display_name }} · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<div class="cover {{ p.avatar_class }}" aria-hidden="true"></div>
+<section class="wrap pf">
+  <header class="pf-head">
+    <span class="avatar avatar-xl {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+    <div class="pf-id">
+      <h1>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" with big=1 %}{% endif %}</h1>
+      <p class="muted">@{{ p.handle }}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</p>
+    </div>
+    <div class="pf-actions">
+      {% include "core/_hire_btn.html" %}
+      <a class="btn btn-ghost" href="{% url 'go' p.handle %}" target="_blank" rel="noopener noreferrer">Instagram</a>
+      {% if can_contact %}<a class="btn btn-ghost" href="https://wa.me/{{ p.whatsapp|cut:'+' }}" target="_blank" rel="noopener noreferrer">WhatsApp</a>{% endif %}
+      <button type="button" class="btn btn-ghost" data-copy>Copy link</button>
+      {% if is_owner %}<a class="btn btn-quiet" href="{% url 'settings' %}">Edit</a>{% endif %}
+    </div>
+  </header>
+  {% if badges %}<ul class="badges">{% for b in badges %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
+  {% if p.bio %}<p class="bio">{{ p.bio }}</p>{% endif %}
+
+  <div class="pf-grid">
+    <div class="pf-main">
+      <section class="panel" aria-labelledby="shop-h">
+        <div class="panel-head"><h2 id="shop-h">The shop</h2></div>
+        {% if photos %}
+        <div class="gallery" data-gallery>
+          {% for ph in photos %}<button type="button" class="shot" data-full="{{ ph.image.url }}" aria-label="Open photo {{ forloop.counter }} of {{ photos|length }}"><img src="{{ ph.image.url }}" alt="{{ p.display_name }} shop photo {{ forloop.counter }}" loading="lazy"></button>{% endfor %}
+        </div>
+        <dialog class="lightbox" data-lightbox aria-label="Shop photo"><button type="button" class="lb-close" aria-label="Close photo">✕</button><img alt=""></dialog>
+        {% elif is_owner %}
+        <div class="empty"><h3>Show creators your shop.</h3><p>Shops with photos get trusted faster.</p><a class="btn btn-primary" href="{% url 'settings' %}#shop">Add photos</a></div>
+        {% else %}<div class="empty"><p>No shop photos yet.</p></div>{% endif %}
+      </section>
+
+      {% if p.address %}
+      <section class="panel" aria-labelledby="loc-h">
+        <div class="panel-head"><h2 id="loc-h">Find the shop</h2></div>
+        <p class="addr">{{ p.address }}{% if p.city %}, {{ p.city }}{% endif %}</p>
+        <div class="mapbox" data-map data-embed="https://www.google.com/maps?q={{ map_q }}&amp;output=embed">
+          <button type="button" class="map-face">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.6"/></svg>
+            <b>Show map</b><span>Tap to load Google Maps</span>
+          </button>
+        </div>
+        <a class="btn btn-ghost" href="https://www.google.com/maps/search/?api=1&amp;query={{ map_q }}" target="_blank" rel="noopener noreferrer">Open in Google Maps</a>
+      </section>
+      {% elif is_owner %}
+      <section class="panel"><div class="empty"><h3>Add your address</h3><p>Creators can then find your shop on a map.</p><a class="btn btn-primary" href="{% url 'settings' %}#profile">Add address</a></div></section>
+      {% endif %}
+
+      {% if campaigns %}
+      <section aria-labelledby="camp-h">
+        <h2 class="mini" id="camp-h">Open campaigns</h2>
+        <div class="cgrid cgrid-2">
+          {% for c in campaigns %}
+          <article class="ccard"><a class="ccard-link" href="{% url 'campaign' c.pk %}" aria-label="Open {{ c.title }}"></a>
+            <h3>{{ c.title }}</h3>
+            <div class="tags">{% for d in c.deliverables|chips|slice:":2" %}<span class="tag tag-soft">{{ d }}</span>{% endfor %}</div>
+            <div class="ccard-foot"><div><b class="budget">{{ c.budget|rupees }}</b><span class="muted">budget</span></div><span class="applied">Send proposal</span></div></article>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% include "core/_reviews.html" %}
+    </div>
+
+    <aside class="pf-side">
+      <section class="panel score-panel">
+        <p class="muted">Creator rating</p>
+        <p class="big-rating">{% if p.rating_count %}{{ p.rating_avg|floatformat:1 }}{% else %}New{% endif %}</p>
+        {% if p.rating_count %}<p class="stars big-stars" aria-hidden="true">{{ p.rating_avg|stars }}</p><p class="muted">{{ p.rating_count }} review{{ p.rating_count|pluralize }}</p>{% else %}<p class="muted">No reviews yet</p>{% endif %}
+        <div class="tiles">
+          <div><b>#{{ info.overall }}</b><span>Of {{ info.total }} brands</span></div>
+          <div><b>{% if info.city %}#{{ info.city }}{% else %}–{% endif %}</b><span>{% if p.city %}{{ p.city }}{% else %}City{% endif %}</span></div>
+          <div><b>{{ p.deals_done }}</b><span>Jobs done</span></div>
+        </div>
+      </section>
+
+      {% if p.verified %}
+      <section class="verify-card ok"><span class="kmark kmark-xl" aria-hidden="true"></span>
+        <div><b>Verified shop</b><span>We checked that this shop is real{% if p.verified_at %} on {{ p.verified_at|date:"j M Y" }}{% endif %}.</span></div></section>
+      {% else %}
+      <section class="verify-card"><div><b>Not verified yet</b><span>Verified shops are ones we've checked are real.{% if is_owner %} <a href="{% url 'settings' %}#verify">Request verification</a>{% endif %}</span></div></section>
+      {% endif %}
+
+      {% if user.is_authenticated and user.profile.role == "creator" %}
+      <section class="panel hire-panel"><h3>Want to work with {{ p.display_name }}?</h3><p>Send a pitch with your price. They reply in your inbox.</p>
+        <a class="btn btn-primary btn-block" href="{% url 'offer_new' p.handle %}">Pitch this brand</a></section>
+      {% elif not user.is_authenticated %}
+      <section class="join-cta"><h3>Are you a creator?</h3><p>Join free, then send this brand a pitch with your price.</p><a class="btn btn-lg" href="{% url 'signup' %}">Join free</a></section>
+      {% endif %}
+    </aside>
+  </div>
+</section>
+{% endblock %}

@@ -6,16 +6,22 @@ from django.db import transaction
 from django.utils import timezone
 
 from .utils import throttle
-from .models import Application, BoostRequest, Campaign, Profile, ShowcasePost
+from .models import Application, BoostRequest, Campaign, Profile, Review, ShopPhoto, ShowcasePost, refresh_rating
 
 
 @admin.register(Profile)
 class ProfileAdmin(admin.ModelAdmin):
-    list_display = ("handle", "role", "niche", "city", "followers", "rank_score", "verified", "boost_until", "boost_impressions")
-    list_filter = ("role", "verified", "niche")
+    list_display = ("handle", "role", "niche", "city", "rank_score", "rating_avg", "rating_count", "verified", "verify_requested")
+    list_filter = ("verify_requested", "verified", "role", "niche")
     search_fields = ("handle", "display_name", "user__email")
     list_editable = ("verified",)
-    readonly_fields = ("rank_score",)
+    readonly_fields = ("rank_score", "rating_avg", "rating_count", "deals_done", "verify_requested")
+
+    def save_model(self, request, obj, form, change):
+        if obj.verified and not obj.verified_at:
+            obj.verified_at = timezone.now()
+            obj.verify_requested = False
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(BoostRequest)
@@ -66,3 +72,23 @@ class ShowcaseAdmin(admin.ModelAdmin):
 # The admin login is a favourite target: allow only 10 attempts per IP per 15 minutes.
 admin.site.login = throttle("adminlogin", limit=10, window=900)(admin.site.login)
 admin.site.site_header = "Kyto admin"
+
+
+@admin.register(Review)
+class ReviewAdmin(admin.ModelAdmin):
+    list_display = ("author", "subject", "rating", "updated")
+    search_fields = ("author__username", "subject__username", "comment")
+
+    def delete_model(self, request, obj):
+        user = obj.subject
+        super().delete_model(request, obj)
+        refresh_rating(user)
+
+    def delete_queryset(self, request, queryset):
+        users = list({r.subject for r in queryset})
+        super().delete_queryset(request, queryset)
+        for u in users:
+            refresh_rating(u)
+
+
+admin.site.register(ShopPhoto)

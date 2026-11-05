@@ -1,0 +1,81 @@
+{% load core_extras %}
+{% if item.kind == "creator" %}{% with p=item.p %}
+<article class="fcard">
+  <header class="fcard-head">
+    <a class="ring ring-s{% if p.verified %} vr{% endif %}" href="{% url 'creator' p.handle %}" aria-hidden="true" tabindex="-1"><span class="avatar {{ p.avatar_class }}">{{ p.initial }}</span></a>
+    <div class="who"><a class="who-name" href="{% url 'creator' p.handle %}">{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" %}{% endif %}</a>
+      <span class="muted">@{{ p.handle }}{% if p.city %} · {{ p.city }}{% endif %}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}</span></div>
+    <span class="rank-chip">#{{ item.rank }}</span>
+  </header>
+  <div class="fmedia {{ p.avatar_class }}">
+    <a class="fill" href="{% url 'creator' p.handle %}" aria-label="Open {{ p.display_name }}'s profile"></a>
+    <div class="cover-stat"><b>{{ p.rank_score }}</b><span>{{ SITE_NAME }} score</span></div>
+    <ul class="cover-chips">
+      <li>{{ p.followers|compact }} followers</li><li>{{ p.engagement }}% engagement</li>
+      {% if p.rating_count %}<li>★ {{ p.rating_avg|floatformat:1 }}</li>{% endif %}
+      {% with n=p.showcase.all|length %}{% if n %}<li>{{ n }} reel{{ n|pluralize }}</li>{% endif %}{% endwith %}
+    </ul>
+  </div>
+  <div class="fcard-actions">
+    <a class="fa-btn" href="{% url 'creator' p.handle %}"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg><span>Profile</span></a>
+    {% if not user.is_authenticated %}<a class="fa-btn fa-main" href="{% url 'login' %}?next={% url 'offer_new' p.handle %}"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg><span>Hire</span></a>
+    {% elif user.profile.role == "brand" %}<a class="fa-btn fa-main" href="{% url 'offer_new' p.handle %}"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg><span>Hire</span></a>{% endif %}
+    <button type="button" class="fa-btn fa-end" data-share="{% url 'creator' p.handle %}" data-title="{{ p.display_name }} on {{ SITE_NAME }}"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v8h14v-8"/></svg><span>Share</span></button>
+  </div>
+  {% if p.bio %}<p class="caption"><b>{{ p.display_name }}</b> {{ p.bio|truncatechars:120 }}</p>{% endif %}
+</article>
+{% endwith %}
+
+{% elif item.kind == "brand" %}{% with p=item.p %}
+<article class="fcard">
+  <header class="fcard-head">
+    <a class="ring ring-s brand{% if p.verified %} vr{% endif %}" href="{% url 'creator' p.handle %}" aria-hidden="true" tabindex="-1"><span class="avatar {{ p.avatar_class }}">{{ p.initial }}</span></a>
+    <div class="who"><a class="who-name" href="{% url 'creator' p.handle %}">{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" %}{% endif %}</a>
+      <span class="muted">Brand{% if p.city %} · {{ p.city }}{% endif %}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}</span></div>
+    <span class="rank-chip">#{{ item.rank }}</span>
+  </header>
+  <div class="fmedia {% if not p.photos.all %}{{ p.avatar_class }}{% endif %}">
+    <a class="fill" href="{% url 'creator' p.handle %}" aria-label="Open {{ p.display_name }}"></a>
+    {% with ph=p.photos.all.0 %}{% if ph %}<img class="fphoto" src="{{ ph.image.url }}" alt="{{ p.display_name }} shop" loading="lazy" decoding="async">{% else %}<div class="cover-stat"><b>{{ p.initial }}</b><span>{{ p.display_name }}</span></div>{% endif %}{% endwith %}
+    <ul class="cover-chips">
+      <li>{% if p.rating_count %}★ {{ p.rating_avg|floatformat:1 }} ({{ p.rating_count }}){% else %}New brand{% endif %}</li>
+      {% if p.open_count %}<li>{{ p.open_count }} open campaign{{ p.open_count|pluralize }}</li>{% endif %}
+      {% if p.address %}<li>Has a shop</li>{% endif %}
+    </ul>
+  </div>
+  <div class="fcard-actions">
+    <a class="fa-btn" href="{% url 'creator' p.handle %}"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.6"/></svg><span>View shop</span></a>
+    {% if not user.is_authenticated %}<a class="fa-btn fa-main" href="{% url 'login' %}?next={% url 'offer_new' p.handle %}"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg><span>Pitch</span></a>
+    {% elif user.profile.role == "creator" %}<a class="fa-btn fa-main" href="{% url 'offer_new' p.handle %}"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg><span>Pitch</span></a>{% endif %}
+    <button type="button" class="fa-btn fa-end" data-share="{% url 'creator' p.handle %}" data-title="{{ p.display_name }} on {{ SITE_NAME }}"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v8h14v-8"/></svg><span>Share</span></button>
+  </div>
+  {% if p.bio %}<p class="caption"><b>{{ p.display_name }}</b> {{ p.bio|truncatechars:120 }}</p>{% endif %}
+</article>
+{% endwith %}
+
+{% else %}{% with c=item.c %}{% with b=c.brand.profile %}
+<article class="fcard">
+  <header class="fcard-head">
+    <a class="ring ring-s brand{% if b.verified %} vr{% endif %}" href="{% url 'creator' b.handle %}" aria-hidden="true" tabindex="-1"><span class="avatar {{ b.avatar_class }}">{{ b.initial }}</span></a>
+    <div class="who"><a class="who-name" href="{% url 'creator' b.handle %}">{{ b.display_name }}{% if b.verified %}{% include "core/_kmark.html" %}{% endif %}</a>
+      <span class="muted">Campaign · {{ c.created|timesince }} ago</span></div>
+    <span class="rank-chip rank-new">New</span>
+  </header>
+  <div class="fmedia {{ b.avatar_class }}">
+    <a class="fill" href="{% url 'campaign' c.pk %}" aria-label="Open {{ c.title }}"></a>
+    <div class="cover-stat"><b class="cs-money">{{ c.budget|rupees }}</b><span>{{ c.title }}</span></div>
+    <ul class="cover-chips">
+      {% for d in c.deliverables|chips|slice:":2" %}<li>{{ d }}</li>{% endfor %}
+      {% if c.city %}<li>{{ c.city }}</li>{% endif %}
+      <li>{{ c.n_apps }} proposal{{ c.n_apps|pluralize }}</li>
+    </ul>
+  </div>
+  <div class="fcard-actions">
+    <a class="fa-btn" href="{% url 'campaign' c.pk %}"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/></svg><span>Details</span></a>
+    {% if not user.is_authenticated or user.profile.role == "creator" %}<a class="fa-btn fa-main" href="{% url 'campaign' c.pk %}#apply"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg><span>Send proposal</span></a>{% endif %}
+    <button type="button" class="fa-btn fa-end" data-share="{% url 'campaign' c.pk %}" data-title="{{ c.title }} on {{ SITE_NAME }}"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v8h14v-8"/></svg><span>Share</span></button>
+  </div>
+  <p class="caption"><b>{{ b.display_name }}</b> {{ c.description|truncatechars:120 }}</p>
+</article>
+{% endwith %}{% endwith %}
+{% endif %}

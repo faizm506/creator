@@ -3,6 +3,9 @@ import math
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
+from django.db.models import Avg, Count, Q
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
 
 NICHES = [
@@ -36,7 +39,13 @@ class Profile(models.Model):
     rate_per_post = models.PositiveIntegerField("Rate per post (₹)", null=True, blank=True, validators=[MaxValueValidator(100_000_000)])
     whatsapp = models.CharField(max_length=15, blank=True, validators=[phone_validator])
     show_contact = models.BooleanField("Show my WhatsApp to signed-in members", default=False)
+    address = models.CharField("Shop address", max_length=200, blank=True)
     verified = models.BooleanField(default=False)
+    verified_at = models.DateTimeField(null=True, blank=True)
+    verify_requested = models.BooleanField(default=False, editable=False)
+    rating_avg = models.FloatField(default=0, editable=False)
+    rating_count = models.PositiveIntegerField(default=0, editable=False)
+    deals_done = models.PositiveIntegerField(default=0, editable=False)
     boost_until = models.DateTimeField(null=True, blank=True)
     views = models.PositiveIntegerField(default=0, editable=False)
     ig_clicks = models.PositiveIntegerField(default=0, editable=False)
@@ -67,19 +76,44 @@ class Profile(models.Model):
         return (self.display_name or self.handle)[:1].upper()
 
     @property
+    def is_brand(self):
+        return self.role == self.BRAND
+
+    @property
     def completeness(self):
-        checks = [bool(self.display_name), bool(self.bio), bool(self.niche), bool(self.city),
-                  self.followers > 0, float(self.engagement) > 0, bool(self.rate_per_post)]
+        if self.is_brand:
+            photos = self.photos.count() if self.pk else 0
+            checks = [bool(self.display_name), bool(self.bio), bool(self.niche), bool(self.city),
+                      bool(self.address), photos > 0]
+        else:
+            checks = [bool(self.display_name), bool(self.bio), bool(self.niche), bool(self.city),
+                      self.followers > 0, float(self.engagement) > 0, bool(self.rate_per_post)]
         return int(100 * sum(checks) / len(checks))
 
+    def bayes_rating(self, prior=3.5, weight=3):
+        """Average rating pulled toward 3.5 until there are enough reviews, so one review can't make or break you."""
+        n = self.rating_count
+        return (self.rating_avg * n + prior * weight) / (n + weight)
+
+    def review_points(self, top):
+        return top * max(0.0, min(1.0, (self.bayes_rating() - 1) / 4))
+
     def score_parts(self):
-        """(label, points, max). Sums to at most 100. Boost never changes it."""
+        """(label, points, max). Each role sums to at most 100. Reviews move you up or down; money never does."""
+        if self.is_brand:
+            return [
+                ("Creator reviews", self.review_points(40), 40),
+                ("Complete shop page", self.completeness * 0.25, 25),
+                ("Verified shop", 20 if self.verified else 0, 20),
+                ("Completed deals", min(15, self.deals_done * 3), 15),
+            ]
         n = min(3, self.showcase.count()) if self.pk else 0
         return [
-            ("Profile completeness", self.completeness * 0.25, 25),
-            ("Audience size", min(35.0, math.log10(self.followers + 1) * 5.25), 35),
-            ("Engagement rate", min(25.0, float(self.engagement) * 4), 25),
+            ("Audience size", min(30.0, math.log10(self.followers + 1) * 4.5), 30),
+            ("Engagement rate", min(20.0, float(self.engagement) * 3.2), 20),
+            ("Complete profile", self.completeness * 0.20, 20),
             ("Reel showcase", n * 10 / 3, 10),
+            ("Brand reviews", self.review_points(15), 15),
             ("Verified", 5 if self.verified else 0, 5),
         ]
 
@@ -104,16 +138,24 @@ class Profile(models.Model):
     @property
     def next_steps(self):
         """Missing items worth points, biggest first."""
-        per = round(25 / 7, 1)
-        n = self.showcase.count() if self.pk else 0
-        items = [
-            ("Add a short bio", bool(self.bio), per), ("Choose your niche", bool(self.niche), per),
-            ("Add your city", bool(self.city), per), ("Add your follower count", self.followers > 0, per),
-            ("Add your engagement rate", float(self.engagement) > 0, per),
-            ("Add your rate per post", bool(self.rate_per_post), per),
-            ("Add a reel to your showcase", n >= 1, 3.3), ("Add a second reel", n >= 2, 3.3),
-            ("Add a third reel", n >= 3, 3.4), ("Ask us for the verified tick", self.verified, 5.0),
-        ]
+        if self.is_brand:
+            photos = self.photos.count() if self.pk else 0
+            items = [
+                ("Get your shop verified", self.verified, 20.0), ("Add a shop photo", photos > 0, 4.2),
+                ("Add your shop address", bool(self.address), 4.2), ("Write a short about", bool(self.bio), 4.2),
+                ("Add your city", bool(self.city), 4.2), ("Choose your business type", bool(self.niche), 4.2),
+            ]
+        else:
+            per = round(20 / 7, 1)
+            n = self.showcase.count() if self.pk else 0
+            items = [
+                ("Add a short bio", bool(self.bio), per), ("Choose your niche", bool(self.niche), per),
+                ("Add your city", bool(self.city), per), ("Add your follower count", self.followers > 0, per),
+                ("Add your engagement rate", float(self.engagement) > 0, per),
+                ("Add your rate per post", bool(self.rate_per_post), per),
+                ("Add a reel to your showcase", n >= 1, 3.3), ("Add a second reel", n >= 2, 3.3),
+                ("Add a third reel", n >= 3, 3.4), ("Get verified by us", self.verified, 5.0),
+            ]
         todo = [(t, pts) for t, done, pts in items if not done]
         return sorted(todo, key=lambda x: -x[1])[:4]
 
@@ -142,6 +184,21 @@ class ShowcasePost(models.Model):
     @property
     def embed_url(self):
         return self.url + "embed/"
+
+
+class ShopPhoto(models.Model):
+    """A photo of a brand's shop. Files are re-encoded to JPEG on upload (see utils.process_image)."""
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="photos")
+    image = models.ImageField(upload_to="shops/")
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created"]
+
+
+@receiver(post_delete, sender=ShopPhoto)
+def _delete_photo_file(sender, instance, **kwargs):
+    instance.image.delete(save=False)
 
 
 class Campaign(models.Model):
@@ -179,6 +236,7 @@ class Offer(models.Model):
     STATUSES = [(PENDING, "Pending"), (ACCEPTED, "Accepted"), (DECLINED, "Declined"),
                 (WITHDRAWN, "Withdrawn"), (COMPLETED, "Completed")]
 
+    INITIATORS = [("brand", "Brand"), ("creator", "Creator")]
     brand = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="offers_sent")
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="offers_received")
     campaign = models.ForeignKey(Campaign, null=True, blank=True, on_delete=models.SET_NULL, related_name="offers")
@@ -186,6 +244,7 @@ class Offer(models.Model):
     deliverables = models.CharField(max_length=200)
     budget = models.PositiveIntegerField("Budget (₹)", validators=[MaxValueValidator(100_000_000)])
     message = models.TextField(max_length=1000)
+    initiator = models.CharField(max_length=10, choices=INITIATORS, default="brand")
     status = models.CharField(max_length=10, choices=STATUSES, default=PENDING, db_index=True)
     created = models.DateTimeField(auto_now_add=True)
     updated = models.DateTimeField(auto_now=True)
@@ -211,6 +270,36 @@ class Message(models.Model):
 
     class Meta:
         ordering = ["created"]
+
+
+class Review(models.Model):
+    """One review per author per person. A newer review after another finished job replaces the old one."""
+    author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reviews_written")
+    subject = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reviews_received")
+    offer = models.ForeignKey(Offer, null=True, blank=True, on_delete=models.SET_NULL, related_name="reviews")
+    rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
+    comment = models.CharField(max_length=400, blank=True)
+    created = models.DateTimeField(auto_now_add=True)
+    updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated"]
+        constraints = [models.UniqueConstraint(fields=["author", "subject"], name="one_review_per_pair")]
+
+
+def refresh_rating(user):
+    """Recalculate a person's average rating and rank after a review is added, changed or removed."""
+    agg = Review.objects.filter(subject=user).aggregate(a=Avg("rating"), n=Count("id"))
+    p = user.profile
+    p.rating_avg = agg["a"] or 0
+    p.rating_count = agg["n"] or 0
+    p.save()
+
+
+def waiting_for(user):
+    """Offers that are waiting for this person to answer."""
+    return Offer.objects.filter(status=Offer.PENDING).filter(
+        Q(brand=user, initiator="creator") | Q(creator=user, initiator="brand"))
 
 
 class BoostRequest(models.Model):

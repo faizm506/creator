@@ -1,6 +1,8 @@
 import math
+import os
 import re
 from datetime import timedelta
+from urllib.parse import quote_plus
 
 from django.conf import settings
 from django.contrib import messages
@@ -11,14 +13,16 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q, Sum
 from django.core.cache import cache
-from django.http import Http404, HttpResponse, HttpResponseRedirect
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from .forms import OfferForm, ApplicationForm, BoostForm, CampaignForm, ProfileForm, ShowcaseForm, SignupForm
-from .models import Message, Offer, NICHES, RANK_ORDER, Application, BoostRequest, Campaign, Profile, ShowcasePost
+from .forms import (BoostForm, CampaignForm, OfferForm, PhotoForm, ProfileForm, ProposalForm, ReviewForm,
+                    ShowcaseForm, SignupForm)
+from .models import (NICHES, RANK_ORDER, BoostRequest, Campaign, Message, Offer, Profile, Review, ShopPhoto,
+                     ShowcasePost, refresh_rating, waiting_for)
 from .utils import client_ip, hit, qr_svg, throttle, upi_link
 
 
@@ -28,6 +32,10 @@ def not_found(request, exception):
 
 def _creators():
     return Profile.objects.filter(role=Profile.CREATOR).select_related("user")
+
+
+def _brands():
+    return Profile.objects.filter(role=Profile.BRAND).select_related("user")
 
 
 def featured_shelf(request, limit=4, **filters):
@@ -63,17 +71,56 @@ def how(request):
     return render(request, "core/how.html", {"cap": settings.FEATURED_SLOTS_PER_NICHE})
 
 
+def _mix(*groups, pattern=(0, 0, 1, 2)):
+    """Interleave creators, campaigns and brands so the feed feels varied."""
+    iters = [iter(g) for g in groups]
+    out, done = [], [False] * len(iters)
+    while not all(done):
+        for idx in pattern:
+            if idx >= len(iters) or done[idx]:
+                continue
+            try:
+                out.append(next(iters[idx]))
+            except StopIteration:
+                done[idx] = True
+        if len(out) > 40:
+            break
+    return out
+
+
 def home(request):
-    top = list(_creators().order_by(*RANK_ORDER)[:5])
-    rising = _creators().filter(created__gte=timezone.now() - timedelta(days=30), rank_score__gte=30).order_by(*RANK_ORDER)[:4]
-    stats = {
-        "creators": _creators().count(),
-        "brands": Profile.objects.filter(role=Profile.BRAND).count(),
-        "campaigns": Campaign.objects.filter(is_open=True).count(),
-        "reach": _creators().aggregate(s=Sum("followers"))["s"] or 0,
-    }
-    return render(request, "core/home.html", {"top": top, "rising": rising, "featured": featured_shelf(request, 4),
-        "champions": niche_champions(), "niches": NICHES, "stats": stats})
+    feed = request.GET.get("feed", "all")
+    if feed not in ("all", "creators", "brands", "campaigns"):
+        feed = "all"
+    creators = list(_creators().prefetch_related("showcase").order_by(*RANK_ORDER)[:20])
+    brands = list(_brands().prefetch_related("photos").annotate(
+        open_count=Count("user__campaigns", filter=Q(user__campaigns__is_open=True), distinct=True)
+    ).order_by(*RANK_ORDER)[:10])
+    campaigns = list(Campaign.objects.filter(is_open=True).select_related("brand__profile").annotate(
+        n_apps=Count("offers", filter=Q(offers__initiator="creator"), distinct=True)).order_by("-created")[:10])
+    c_items = [{"kind": "creator", "p": p, "rank": i + 1} for i, p in enumerate(creators[:12])]
+    b_items = [{"kind": "brand", "p": p, "rank": i + 1} for i, p in enumerate(brands[:8])]
+    k_items = [{"kind": "campaign", "c": c} for c in campaigns[:8]]
+    if feed == "creators":
+        items = c_items
+    elif feed == "brands":
+        items = b_items
+    elif feed == "campaigns":
+        items = k_items
+    else:
+        items = _mix(c_items, b_items, k_items, pattern=(0, 0, 2, 0, 1, 2))
+    stories = []
+    for i in range(max(len(creators[:9]), len(brands[:4]))):
+        if i < len(creators[:9]):
+            stories.append(creators[i])
+        if i < len(brands[:4]) and i % 2 == 1:
+            stories.append(brands[i])
+    me = request.user.profile if request.user.is_authenticated else None
+    return render(request, "core/home.html", {
+        "feed": feed, "items": items, "stories": stories, "niches": [n for n in NICHES if n[0] != "other"],
+        "rail_creators": creators[:5], "rail_brands": brands[:3],
+        "me": me, "my_info": rank_info(me) if me else None,
+    })
 
 
 @throttle("signup", limit=8, window=3600)
@@ -116,10 +163,11 @@ class LoginView(auth_views.LoginView):
 
 
 def leaderboard(request):
+    kind = "brands" if request.GET.get("kind") == "brands" else "creators"
     niche = request.GET.get("niche", "")
     city = request.GET.get("city", "").strip()[:60]
     q = request.GET.get("q", "").strip()[:60]
-    qs = _creators()
+    qs = _brands() if kind == "brands" else _creators()
     if niche in dict(NICHES):
         qs = qs.filter(niche=niche)
     else:
@@ -134,18 +182,18 @@ def leaderboard(request):
         fl["niche"] = niche
     if city:
         fl["city__icontains"] = city
-    featured = featured_shelf(request, 3, **fl) if page.number == 1 and not q else []
+    featured = featured_shelf(request, 3, **fl) if kind == "creators" and page.number == 1 and not q else []
     params = request.GET.copy()
     params.pop("page", None)
     return render(request, "core/leaderboard.html", {
         "page": page, "featured": featured, "niches": NICHES, "niche": niche, "city": city, "q": q,
-        "qs": params.urlencode(),
+        "qs": params.urlencode(), "kind": kind,
     })
 
 
 def rank_info(p):
-    """Rank among all creators, in the creator's city and niche, with the same tie-breaks as the leaderboard."""
-    base = _creators()
+    """Rank among people of the same kind (creators or brands), in their city and niche, with the leaderboard's tie-breaks."""
+    base = Profile.objects.filter(role=p.role)
     total = base.count()
     ahead = base.filter(
         Q(rank_score__gt=p.rank_score)
@@ -164,17 +212,25 @@ def rank_info(p):
 def earned_badges(p, info):
     b = []
     if p.verified:
-        b.append("Verified creator")
+        b.append("Verified shop" if p.is_brand else "Verified creator")
     if info["overall"] <= 10:
-        b.append("Top 10 overall")
+        b.append("Top 10 brand" if p.is_brand else "Top 10 overall")
     if p.city and info["city"] and info["city"] <= 10:
         b.append(f"#{info['city']} in {p.city}")
-    if p.niche and info["niche"] and info["niche"] <= 3:
+    if not p.is_brand and p.niche and info["niche"] and info["niche"] <= 3:
         b.append(f"Top 3 in {p.get_niche_display()}")
-    if (timezone.now() - p.created).days <= 30 and p.rank_score >= 40:
-        b.append("Rising star")
-    if p.showcase.count() >= 3:
-        b.append("Showcase ready")
+    if p.rating_count >= 3 and p.rating_avg >= 4.5:
+        b.append("Top rated")
+    if p.deals_done >= 3:
+        b.append(f"{p.deals_done} jobs done")
+    if p.is_brand:
+        if p.photos.count() >= 3:
+            b.append("Photo-ready shop")
+    else:
+        if (timezone.now() - p.created).days <= 30 and p.rank_score >= 40:
+            b.append("Rising star")
+        if p.showcase.count() >= 3:
+            b.append("Showcase ready")
     if p.completeness == 100:
         b.append("Complete profile")
     if p.is_boosted:
@@ -191,16 +247,24 @@ def creator_detail(request, handle):
             Profile.objects.filter(pk=p.pk).update(views=F("views") + 1)
             request.session["seen"] = (seen + [p.handle])[-60:]
             p.views += 1
-    info = rank_info(p) if p.is_creator else None
-    similar = []
-    if p.is_creator and p.niche:
-        similar = _creators().filter(niche=p.niche).exclude(pk=p.pk).order_by(*RANK_ORDER)[:3]
-    return render(request, "core/creator.html", {
-        "p": p, "info": info, "badges": earned_badges(p, info) if info else [],
-        "showcase": p.showcase.all(), "similar": similar, "is_owner": is_owner,
+    info = rank_info(p)
+    ctx = {
+        "p": p, "info": info, "badges": earned_badges(p, info), "is_owner": is_owner,
+        "reviews": Review.objects.filter(subject=p.user).select_related("author__profile")[:10],
         "can_contact": bool(p.whatsapp) and request.user.is_authenticated and (p.show_contact or _connected(request.user, p.user)),
-        "rate": p.suggested_rate if p.is_creator else None,
-    })
+    }
+    if p.is_brand:
+        place = ", ".join(x for x in (p.address, p.city) if x)
+        ctx.update({
+            "photos": p.photos.all(), "campaigns": p.user.campaigns.filter(is_open=True)[:4],
+            "map_q": quote_plus(place) if p.address else "",
+        })
+        return render(request, "core/brand.html", ctx)
+    similar = []
+    if p.niche:
+        similar = _creators().filter(niche=p.niche).exclude(pk=p.pk).order_by(*RANK_ORDER)[:3]
+    ctx.update({"showcase": p.showcase.all(), "similar": similar, "rate": p.suggested_rate})
+    return render(request, "core/creator.html", ctx)
 
 
 def _connected(a, b):
@@ -218,12 +282,12 @@ def ig_go(request, handle):
 
 
 def _dash_stats(user, profile):
-    if profile.role == Profile.BRAND:
-        sent = Offer.objects.filter(brand=user)
-        return {"sent": sent.count(), "hired": sent.filter(status__in=[Offer.ACCEPTED, Offer.COMPLETED]).count(),
-                "campaigns": Campaign.objects.filter(brand=user, is_open=True).count()}
-    return {"waiting": Offer.objects.filter(creator=user, status=Offer.PENDING).count(),
-            "hired": Offer.objects.filter(creator=user, status__in=[Offer.ACCEPTED, Offer.COMPLETED]).count()}
+    hired = Offer.objects.filter(Q(brand=user) | Q(creator=user), status__in=[Offer.ACCEPTED, Offer.COMPLETED]).count()
+    stats = {"waiting": waiting_for(user).count(), "hired": hired}
+    if profile.is_brand:
+        stats["sent"] = Offer.objects.filter(brand=user, initiator="brand").count()
+        stats["campaigns"] = Campaign.objects.filter(brand=user, is_open=True).count()
+    return stats
 
 
 @login_required
@@ -234,13 +298,12 @@ def settings_view(request):
         form.save()
         messages.success(request, "Profile saved.")
         return redirect("settings")
-    info = rank_info(profile) if profile.is_creator else None
     pending = request.user.boost_requests.filter(status=BoostRequest.PENDING).exists()
     return render(request, "core/settings.html", {
-        "form": form, "p": profile, "info": info, "pending": pending,
-        "steps": profile.next_steps if profile.is_creator else [],
-        "stats": _dash_stats(request.user, profile),
-        "showcase": profile.showcase.all(), "showcase_form": ShowcaseForm(),
+        "form": form, "p": profile, "info": rank_info(profile), "pending": pending,
+        "steps": profile.next_steps, "stats": _dash_stats(request.user, profile),
+        "showcase": profile.showcase.all(), "photos": profile.photos.all(),
+        "reviews": Review.objects.filter(subject=request.user).select_related("author__profile")[:5],
     })
 
 
@@ -312,7 +375,7 @@ def boost(request):
 
 
 def campaign_list(request):
-    qs = Campaign.objects.filter(is_open=True).select_related("brand__profile").annotate(n_apps=Count("applications"))
+    qs = Campaign.objects.filter(is_open=True).select_related("brand__profile").annotate(n_apps=Count("offers", filter=Q(offers__initiator="creator")))
     niche = request.GET.get("niche", "")
     if niche in dict(NICHES):
         qs = qs.filter(niche=niche)
@@ -341,17 +404,21 @@ def campaign_new(request):
 
 def campaign_detail(request, pk):
     c = get_object_or_404(Campaign.objects.select_related("brand__profile"), pk=pk)
-    is_owner = request.user.is_authenticated and c.brand_id == request.user.id
-    applications = c.applications.select_related("creator__profile") if is_owner else []
-    applied = request.user.is_authenticated and c.applications.filter(creator=request.user).exists()
-    can_apply = (request.user.is_authenticated and request.user.profile.role == Profile.CREATOR
-                 and c.is_open and not applied)
+    user = request.user
+    is_owner = user.is_authenticated and c.brand_id == user.id
+    proposals_qs = Offer.objects.filter(campaign=c, initiator="creator").select_related("creator__profile")
+    mine = None
+    if user.is_authenticated and not is_owner:
+        mine = proposals_qs.filter(creator=user).first()
+    applied = bool(mine and mine.is_open)
+    is_creator = user.is_authenticated and user.profile.role == Profile.CREATOR
     more = Campaign.objects.filter(is_open=True).exclude(pk=c.pk).select_related("brand__profile")
     if c.niche:
         more = more.filter(niche=c.niche)
     return render(request, "core/campaign.html", {
-        "c": c, "is_owner": is_owner, "applications": applications, "applied": applied,
-        "can_apply": can_apply, "form": ApplicationForm(), "n_apps": c.applications.count(), "more": more[:2],
+        "c": c, "is_owner": is_owner, "proposals": proposals_qs if is_owner else [], "mine": mine, "applied": applied,
+        "can_apply": is_creator and c.is_open and not applied, "form": ProposalForm(initial={"budget": c.budget}),
+        "n_apps": proposals_qs.count(), "more": more[:2],
     })
 
 
@@ -359,22 +426,26 @@ def campaign_detail(request, pk):
 @require_POST
 @throttle("apply", limit=20, window=3600)
 def campaign_apply(request, pk):
+    """A creator sends the brand a proposal with their own price. The brand accepts or declines it."""
     c = get_object_or_404(Campaign, pk=pk, is_open=True)
     if request.user.profile.role != Profile.CREATOR:
-        messages.error(request, "Only creator accounts can apply.")
+        messages.error(request, "Only creator accounts can send proposals.")
         return redirect("campaign", pk=pk)
-    form = ApplicationForm(request.POST)
-    if form.is_valid():
-        a = form.save(commit=False)
-        a.campaign, a.creator = c, request.user
-        try:
-            a.save()
-            messages.success(request, "Application sent.")
-        except IntegrityError:
-            messages.info(request, "You have already applied.")
-    else:
-        messages.error(request, "Add a short message with your application.")
-    return redirect("campaign", pk=pk)
+    form = ProposalForm(request.POST)
+    if not form.is_valid():
+        err = next(iter(form.errors.values()))[0]
+        messages.error(request, err)
+        return redirect("campaign", pk=pk)
+    if Offer.objects.filter(campaign=c, creator=request.user, initiator="creator",
+                            status__in=[Offer.PENDING, Offer.ACCEPTED]).exists():
+        messages.info(request, "You already sent a proposal for this campaign.")
+        return redirect("campaign", pk=pk)
+    o = Offer.objects.create(
+        brand=c.brand, creator=request.user, campaign=c, initiator="creator", title=c.title,
+        deliverables=c.deliverables, budget=form.cleaned_data["budget"], message=form.cleaned_data["message"],
+    )
+    messages.success(request, "Proposal sent. The brand will reply in your inbox.")
+    return redirect("offer", pk=o.pk)
 
 
 @login_required
@@ -429,28 +500,41 @@ def _offer_or_404(request, pk):
 @login_required
 @throttle("offer", limit=15, window=86400)
 def offer_new(request, handle):
-    target = get_object_or_404(Profile.objects.select_related("user"), handle=handle.lower(), role=Profile.CREATOR)
-    if request.user.profile.role != Profile.BRAND:
-        messages.error(request, "Only brand accounts can send offers. Create a brand account to hire creators.")
+    """Brand hires a creator, or a creator pitches a brand. Same form, opposite directions."""
+    target = get_object_or_404(Profile.objects.select_related("user"), handle=handle.lower())
+    me = request.user.profile
+    if target.user_id == request.user.pk:
+        return redirect("settings")
+    if me.role == target.role:
+        messages.error(request, "Brands hire creators, and creators pitch brands.")
         return redirect("creator", handle=target.handle)
-    dup = Offer.objects.filter(brand=request.user, creator=target.user, status=Offer.PENDING).first()
+    by_creator = me.role == Profile.CREATOR
+    brand_user = target.user if by_creator else request.user
+    creator_user = request.user if by_creator else target.user
+    dup = Offer.objects.filter(brand=brand_user, creator=creator_user, initiator=me.role, status=Offer.PENDING).first()
     if dup:
-        messages.info(request, "You already have a pending offer with this creator.")
+        messages.info(request, "You already have a pending offer here.")
         return redirect("offer", pk=dup.pk)
     initial = {}
     cid = request.GET.get("campaign", "")
     if cid.isdigit():
-        c = Campaign.objects.filter(pk=cid, brand=request.user, is_open=True).first()
+        c = Campaign.objects.filter(pk=cid, brand=brand_user, is_open=True).first()
         if c:
             initial = {"campaign": c, "title": c.title, "deliverables": c.deliverables, "budget": c.budget}
-    form = OfferForm(request.POST or None, brand=request.user, initial=initial)
+    form = OfferForm(request.POST or None, brand=brand_user, by_creator=by_creator, initial=initial)
     if request.method == "POST" and form.is_valid():
         o = form.save(commit=False)
-        o.brand, o.creator = request.user, target.user
+        o.brand, o.creator, o.initiator = brand_user, creator_user, me.role
         o.save()
-        messages.success(request, f"Offer sent to {target.display_name}. You'll be notified here when they reply.")
+        messages.success(request, f"Sent to {target.display_name}. You'll see their reply in your inbox.")
         return redirect("offer", pk=o.pk)
-    return render(request, "core/offer_form.html", {"form": form, "t": target, "rate": target.suggested_rate})
+    return render(request, "core/offer_form.html", {
+        "form": form, "t": target, "by_creator": by_creator, "rate": target.suggested_rate if not by_creator else None,
+    })
+
+
+def _is_initiator(o, user):
+    return ("brand" if user.pk == o.brand_id else "creator") == o.initiator
 
 
 @login_required
@@ -458,42 +542,78 @@ def offer_detail(request, pk):
     o = _offer_or_404(request, pk)
     o.messages.filter(read=False).exclude(sender=request.user).update(read=True)
     is_brand = request.user.pk == o.brand_id
-    other = (o.creator if is_brand else o.brand).profile
-    thread = [{"mine": is_brand, "body": o.message, "at": o.created, "first": True}]
+    is_init = _is_initiator(o, request.user)
+    other_user = o.creator if is_brand else o.brand
+    other = other_user.profile
+    thread = [{"mine": is_init, "body": o.message, "at": o.created, "first": True}]
     thread += [{"mine": m.sender_id == request.user.pk, "body": m.body, "at": m.created, "first": False}
                for m in o.messages.all()]
     return render(request, "core/offer.html", {
-        "o": o, "thread": thread, "is_brand": is_brand, "other": other,
+        "o": o, "thread": thread, "is_brand": is_brand, "is_init": is_init, "other": other,
         "reveal": o.status in (Offer.ACCEPTED, Offer.COMPLETED) and bool(other.whatsapp),
+        "my_review": Review.objects.filter(author=request.user, subject=other_user).first(),
+        "their_review": Review.objects.filter(author=other_user, subject=request.user).first(),
+        "review_form": ReviewForm(),
     })
 
 
-ACTIONS = {  # action: (who may do it, from status, to status, message)
-    "accept": ("creator", Offer.PENDING, Offer.ACCEPTED, "Offer accepted. You can both see each other's WhatsApp now."),
-    "decline": ("creator", Offer.PENDING, Offer.DECLINED, "Offer declined."),
-    "withdraw": ("brand", Offer.PENDING, Offer.WITHDRAWN, "Offer withdrawn."),
-    "complete": ("brand", Offer.ACCEPTED, Offer.COMPLETED, "Marked as completed. Nice work."),
+ACTION_MESSAGES = {
+    "accept": "Accepted. You can both see each other's WhatsApp number now.",
+    "decline": "Declined.",
+    "withdraw": "Withdrawn.",
+    "complete": "Marked as finished. You can now leave each other a review.",
 }
 
 
 @login_required
 @require_POST
 def offer_action(request, pk, action):
-    rule = ACTIONS.get(action)
-    if not rule:
+    """Whoever did not start the offer can accept or decline it. The starter can withdraw it while it waits.
+    Either side can mark accepted work as finished."""
+    if action not in ACTION_MESSAGES:
         raise Http404
-    who, frm, to, msg = rule
     with transaction.atomic():
         o = _offer_or_404(request, pk)
-        o = Offer.objects.select_for_update().get(pk=o.pk)
-        role = "brand" if request.user.pk == o.brand_id else "creator"
-        if role != who or o.status != frm:
-            messages.error(request, "That action isn't available for this offer right now.")
+        o = Offer.objects.select_for_update().select_related("brand__profile", "creator__profile").get(pk=o.pk)
+        is_init = _is_initiator(o, request.user)
+        to = None
+        if action in ("accept", "decline") and o.status == Offer.PENDING and not is_init:
+            to = Offer.ACCEPTED if action == "accept" else Offer.DECLINED
+        elif action == "withdraw" and o.status == Offer.PENDING and is_init:
+            to = Offer.WITHDRAWN
+        elif action == "complete" and o.status == Offer.ACCEPTED:
+            to = Offer.COMPLETED
+        if to is None:
+            messages.error(request, "That isn't available for this offer right now.")
         else:
             o.status, o.responded_at = to, timezone.now()
             o.save()
-            messages.success(request, msg)
+            if to == Offer.COMPLETED:
+                for person in (o.brand.profile, o.creator.profile):
+                    person.deals_done += 1
+                    person.save()
+            messages.success(request, ACTION_MESSAGES[action])
     return redirect("offer", pk=pk)
+
+
+@login_required
+@require_POST
+@throttle("review", limit=20, window=3600)
+def review_add(request, pk):
+    o = _offer_or_404(request, pk)
+    if o.status != Offer.COMPLETED:
+        messages.error(request, "You can leave a review once the work is marked as finished.")
+        return redirect("offer", pk=pk)
+    subject = o.creator if request.user.pk == o.brand_id else o.brand
+    form = ReviewForm(request.POST)
+    if form.is_valid():
+        Review.objects.update_or_create(author=request.user, subject=subject, defaults={
+            "offer": o, "rating": form.cleaned_data["rating"], "comment": form.cleaned_data["comment"].strip()})
+        refresh_rating(subject)
+        messages.success(request, "Thank you! Your review is live.")
+    else:
+        messages.error(request, next(iter(form.errors.values()))[0])
+    return redirect(reverse("offer", args=[pk]) + "#review")
 
 
 @login_required
@@ -548,3 +668,72 @@ def humans(request):
     body = (f"/* THE TEAM */\nBuilt by: Zyrac\nInstagram: {settings.ZYRAC_URL}\nFrom: Ahmedabad, Gujarat, India\n\n"
             f"/* THE SITE */\nName: {settings.SITE_NAME}\nMade with: Django, vanilla JavaScript and hand-written CSS\n")
     return HttpResponse(body, content_type="text/plain; charset=utf-8")
+
+
+# ---------- verification, shop photos, media ----------
+@login_required
+@require_POST
+def verify_request(request):
+    p = request.user.profile
+    if p.verified:
+        messages.info(request, "You're already verified.")
+    elif p.verify_requested:
+        messages.info(request, "Your request is already with us. We'll review it soon.")
+    elif p.is_brand and not (p.address and p.photos.exists()):
+        messages.error(request, "Add your shop address and at least one shop photo first, so we have something to check.")
+    elif not p.is_brand and not (p.followers and p.showcase.exists()):
+        messages.error(request, "Add your follower count and at least one reel first, so we have something to check.")
+    else:
+        Profile.objects.filter(pk=p.pk).update(verify_requested=True)
+        messages.success(request, "Request sent. We'll check your profile and add the verified tick.")
+    return redirect(reverse("settings") + "#verify")
+
+
+@login_required
+@require_POST
+@throttle("photo", limit=20, window=3600)
+def photo_add(request):
+    p = request.user.profile
+    if not p.is_brand:
+        return redirect("settings")
+    if p.photos.count() >= 6:
+        messages.error(request, "You can add up to 6 photos. Remove one to add another.")
+        return redirect(reverse("settings") + "#shop")
+    form = PhotoForm(request.POST, request.FILES)
+    if form.is_valid():
+        content = form.cleaned_data["image"]
+        photo = ShopPhoto(profile=p)
+        photo.image.save(content.name, content, save=True)
+        p.save()
+        messages.success(request, "Photo added to your shop page.")
+    else:
+        messages.error(request, next(iter(form.errors.values()))[0])
+    return redirect(reverse("settings") + "#shop")
+
+
+@login_required
+@require_POST
+def photo_remove(request, pk):
+    p = request.user.profile
+    get_object_or_404(ShopPhoto, pk=pk, profile=p).delete()
+    p.save()
+    messages.success(request, "Photo removed.")
+    return redirect(reverse("settings") + "#shop")
+
+
+def media_file(request, path):
+    """Serves uploaded shop photos. Only .jpg files inside MEDIA_ROOT, never anything else."""
+    from django.core.exceptions import SuspiciousFileOperation
+    from django.utils._os import safe_join
+    if not path.endswith(".jpg"):
+        raise Http404
+    try:
+        full = safe_join(settings.MEDIA_ROOT, path)
+    except SuspiciousFileOperation:
+        raise Http404
+    if not os.path.isfile(full):
+        raise Http404
+    resp = FileResponse(open(full, "rb"), content_type="image/jpeg")
+    resp["Cache-Control"] = "public, max-age=86400"
+    resp["X-Content-Type-Options"] = "nosniff"
+    return resp

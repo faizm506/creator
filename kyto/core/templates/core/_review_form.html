@@ -1,0 +1,8 @@
+<form method="post" action="{% url 'review_add' o.pk %}" class="review-form">
+  {% csrf_token %}
+  <div class="stars-input" role="radiogroup" aria-label="Your rating">
+    {% for n in "54321" %}<input type="radio" id="star{{ n }}" name="rating" value="{{ n }}" required><label for="star{{ n }}" title="{{ n }} star{{ n|pluralize }}"><span class="sr">{{ n }} stars</span>★</label>{% endfor %}
+  </div>
+  <textarea name="comment" rows="3" maxlength="400" placeholder="Was it easy to work together? (optional)" aria-label="Your comment"></textarea>
+  <button class="btn btn-primary">{{ label|default:"Post review" }}</button>
+</form>

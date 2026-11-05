@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db.models import Q
 
-from .models import Message, Offer
+from .models import Message, waiting_for
 
 
 def site(request):
@@ -10,6 +10,5 @@ def site(request):
     u = getattr(request, "user", None)
     if u is not None and u.is_authenticated:
         unread = Message.objects.filter(read=False).filter(Q(offer__brand=u) | Q(offer__creator=u)).exclude(sender=u).count()
-        waiting = Offer.objects.filter(creator=u, status=Offer.PENDING).count()
-        ctx["inbox_count"] = unread + waiting
+        ctx["inbox_count"] = unread + waiting_for(u).count()
     return ctx

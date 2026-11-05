@@ -1,0 +1,15 @@
+{% load core_extras %}
+<section class="panel" id="reviews" aria-labelledby="rev-h">
+  <div class="panel-head"><h2 id="rev-h">Reviews</h2>
+    {% if p.rating_count %}<span class="rating-sum"><b>{{ p.rating_avg|floatformat:1 }}</b> <span class="stars" aria-hidden="true">{{ p.rating_avg|stars }}</span> <span class="muted">{{ p.rating_count }} review{{ p.rating_count|pluralize }}</span></span>{% endif %}</div>
+  {% for r in reviews %}
+  <article class="review">
+    <div class="review-top"><span class="avatar {{ r.author.profile.avatar_class }}" aria-hidden="true">{{ r.author.profile.initial }}</span>
+      <div><a href="{% url 'creator' r.author.profile.handle %}"><b>{{ r.author.profile.display_name }}</b></a><span class="muted">{{ r.updated|date:"j M Y" }}</span></div>
+      <span class="stars" aria-label="{{ r.rating }} out of 5">{{ r.rating|stars }}</span></div>
+    {% if r.comment %}<p>{{ r.comment }}</p>{% endif %}
+  </article>
+  {% empty %}
+  <div class="empty"><p>No reviews yet. Reviews appear after a finished job, so every one is real.</p></div>
+  {% endfor %}
+</section>

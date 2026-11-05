@@ -4,8 +4,13 @@
 {% block content %}
 <section class="wrap page-head">
   <h1>Leaderboard</h1>
-  <p class="lead-s">Creators ranked by score. Filter by niche or city to find the right fit.</p>
+  <div class="seg seg-link" role="tablist" aria-label="Choose a leaderboard">
+    <a role="tab" class="{% if kind == 'creators' %}on{% endif %}" href="?kind=creators">Creators</a>
+    <a role="tab" class="{% if kind == 'brands' %}on{% endif %}" href="?kind=brands">Brands</a>
+  </div>
+  <p class="lead-s">{% if kind == 'brands' %}Brands ranked by what creators say about working with them.{% else %}Creators ranked by score. Filter by niche or city to find the right fit.{% endif %}</p>
   <form class="filters" method="get">
+    <input type="hidden" name="kind" value="{{ kind }}">
     <input type="search" name="q" value="{{ q }}" placeholder="Search name or handle" aria-label="Search">
     <select name="niche" aria-label="Niche">
       <option value="">All niches</option>
@@ -15,8 +20,8 @@
     <button class="btn btn-primary">Apply</button>
   </form>
   <div class="chips" role="group" aria-label="Quick niche filter">
-    <a class="chip{% if not niche %} on{% endif %}" href="?city={{ city|urlencode }}">All</a>
-    {% for k, label in niches %}<a class="chip{% if k == niche %} on{% endif %}" href="?niche={{ k }}&city={{ city|urlencode }}">{{ label }}</a>{% endfor %}
+    <a class="chip{% if not niche %} on{% endif %}" href="?kind={{ kind }}&amp;city={{ city|urlencode }}">All</a>
+    {% for k, label in niches %}<a class="chip{% if k == niche %} on{% endif %}" href="?kind={{ kind }}&amp;niche={{ k }}&amp;city={{ city|urlencode }}">{{ label }}</a>{% endfor %}
   </div>
   <input class="live" type="search" data-live placeholder="Type to filter this page instantly" aria-label="Filter results on this page">
 </section>
@@ -32,7 +37,7 @@
   <div class="rows" data-rows>
     {% for p in page %}{% include "core/_row.html" with rank=forloop.counter|add:page.start_index|add:"-1" %}
     {% empty %}
-      <div class="empty"><h3>No creators match yet.</h3><p>Clear a filter, or <a href="{% url 'signup' %}">be the first to join</a>.</p></div>
+      <div class="empty"><h3>Nobody matches yet.</h3><p>Clear a filter, or <a href="{% url 'signup' %}">be the first to join</a>.</p></div>
     {% endfor %}
   </div>
   {% if page.paginator.num_pages > 1 %}

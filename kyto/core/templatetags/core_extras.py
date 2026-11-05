@@ -39,3 +39,13 @@ def chips(value):
     """'2 reels + 3 stories, 1 post' -> ['2 reels', '3 stories', '1 post']"""
     import re
     return [p.strip() for p in re.split(r"\s*(?:\+|,|&|\band\b)\s*", value or "") if p.strip()][:6]
+
+
+@register.filter
+def stars(value):
+    """4.6 -> '★★★★★' (rounded), 3 -> '★★★☆☆'"""
+    try:
+        n = max(0, min(5, int(round(float(value)))))
+    except (TypeError, ValueError):
+        n = 0
+    return "★" * n + "☆" * (5 - n)

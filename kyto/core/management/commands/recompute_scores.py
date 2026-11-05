@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
 
-from core.models import Profile
+from kyto.core.models import Profile
 
 
 class Command(BaseCommand):

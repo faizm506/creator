@@ -3,7 +3,7 @@ import random
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
-from core.models import Campaign, Profile
+from kyto.core.models import Campaign, Profile
 
 User = get_user_model()
 
@@ -39,7 +39,7 @@ class Command(BaseCommand):
             b = User.objects.create_user("demo.brand", "brand@example.com")
             b.set_unusable_password()
             b.save()
-            Profile.objects.create(user=b, handle="demo.brand", role=Profile.BRAND, display_name="Demo Brand", city="Ahmedabad")
+            Profile.objects.create(user=b, handle="demo.brand", role=Profile.BRAND, display_name="Demo Brand", city="Ahmedabad", address="SG Highway, Ahmedabad")
             Campaign.objects.create(
                 brand=b, title="Cafe launch reels", niche="food", city="Ahmedabad", budget=15000,
                 deliverables="2 reels + 3 stories", description="We're opening a new cafe on SG Highway and want local food creators to visit and share their experience.",

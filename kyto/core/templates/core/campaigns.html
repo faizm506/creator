@@ -37,7 +37,7 @@
       </div>
       <div class="ccard-foot">
         <div><b class="budget">{{ c.budget|rupees }}</b><span class="muted">budget</span></div>
-        <span class="applied">{{ c.n_apps }} applied</span>
+        <span class="applied">{{ c.n_apps }} proposal{{ c.n_apps|pluralize }}</span>
       </div>
     </article>
     {% endfor %}
