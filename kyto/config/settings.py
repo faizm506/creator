@@ -119,7 +119,7 @@ USE_TZ = True
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 try:  # keeps WhiteNoise quiet in development; collectstatic fills it for production
     STATIC_ROOT.mkdir(exist_ok=True)
