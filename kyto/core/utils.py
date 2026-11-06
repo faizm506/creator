@@ -7,6 +7,7 @@ import qrcode.image.svg
 from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
+from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
@@ -40,6 +41,8 @@ def throttle(name, limit, window=900):
             if request.method == "POST":
                 who = request.user.pk if request.user.is_authenticated else client_ip(request)
                 if hit(f"thr:{name}:{who}", window) > limit:
+                    if request.headers.get("X-Kyto") == "chat":
+                        return JsonResponse({"ok": False, "error": "Slow down a little. Try again in a few minutes."}, status=429)
                     messages.error(request, "Too many attempts. Please wait a few minutes and try again.")
                     ref = request.META.get("HTTP_REFERER", "")
                     ok = ref and url_has_allowed_host_and_scheme(ref, allowed_hosts={request.get_host()})

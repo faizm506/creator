@@ -40,7 +40,7 @@
         </a>
         <div class="summary">
           <div><span class="muted">Score</span><b>{{ p.rank_score }}</b></div>
-          <div class="grow"><span class="muted">Top {{ info.top_pct }}% of {{ info.total }} {% if p.is_brand %}brands{% else %}creators{% endif %}</span>
+          <div class="grow"><span class="muted">{% if info.total < 10 %}Founding member. You got here early.{% else %}Top {{ info.top_pct }}% of {{ info.total }} {% if p.is_brand %}brands{% else %}creators{% endif %}{% endif %}</span>
             <progress max="100" value="{{ p.rank_score|stringformat:'.1f' }}" data-anim></progress></div>
         </div>
         {% if steps %}
@@ -145,7 +145,7 @@
         <details class="danger">
           <summary>Delete account</summary>
           <p>This permanently removes your profile, offers and messages. It can't be undone.</p>
-          <form method="post" action="{% url 'delete_account' %}" data-confirm="Delete your account for good?">
+          <form method="post" action="{% url 'delete_account' %}" data-confirm="Delete your account for good? We will miss you. A little.">
             {% csrf_token %}
             <input type="password" name="password" placeholder="Confirm your password" autocomplete="current-password" aria-label="Password" required>
             <button class="btn btn-danger">Delete my account</button>

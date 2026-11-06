@@ -7,7 +7,7 @@
   <form method="post" class="group">
     {% csrf_token %}
     <input type="hidden" name="next" value="{{ next }}">
-    {% if form.errors %}<p class="notice err-box">That handle and password don't match. Check both and try again.</p>{% endif %}
+    {% if form.errors %}<p class="notice err-box">Nope. That handle and password aren't on speaking terms. Try again.</p>{% endif %}
     {% for field in form %}{% include "core/_field.html" %}{% endfor %}
     <button class="btn btn-primary btn-block">Sign in</button>
   </form>

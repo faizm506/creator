@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="{% static 'core/css/app.css' %}">
   <script src="{% static 'core/js/app.js' %}" defer></script>
 </head>
-<body>
+<body data-admin="{{ ADMIN_PATH }}">
 {% with u=request.resolver_match.url_name %}
 <div class="util"><div class="util-in">
   <span class="util-left"><i class="dot"></i> Free to join while we launch</span>

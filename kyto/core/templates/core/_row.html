@@ -1,7 +1,7 @@
 {% load core_extras %}
 <a class="row{% if p.is_boosted %} is-boosted{% endif %}" data-search="{{ p.display_name|lower }} {{ p.handle }}" href="{% url 'creator' p.handle %}">
   <span class="row-rank r{{ rank }}">{% if rank %}{{ rank }}{% endif %}</span>
-  <span class="avatar {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+  <span class="ring ring-s{% if p.is_brand %} brand{% endif %}{% if p.verified %} vr{% endif %}" aria-hidden="true"><span class="avatar {{ p.avatar_class }}">{{ p.initial }}</span></span>
   <span class="row-main">
     <strong>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" %}{% endif %}</strong>
     <span class="muted">@{{ p.handle }}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</span>

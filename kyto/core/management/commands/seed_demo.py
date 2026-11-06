@@ -3,7 +3,7 @@ import random
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 
-from kyto.core.models import Campaign, Profile
+from core.models import Campaign, Profile
 
 User = get_user_model()
 

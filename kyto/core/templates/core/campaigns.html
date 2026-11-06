@@ -25,7 +25,7 @@
     <article class="ccard">
       <a class="ccard-link" href="{% url 'campaign' c.pk %}" aria-label="Open {{ c.title }}"></a>
       <div class="ccard-top">
-        <span class="avatar {{ c.brand.profile.avatar_class }}" aria-hidden="true">{{ c.brand.profile.initial }}</span>
+        <span class="ring ring-s brand{% if c.brand.profile.verified %} vr{% endif %}" aria-hidden="true"><span class="avatar {{ c.brand.profile.avatar_class }}">{{ c.brand.profile.initial }}</span></span>
         <div><b>{{ c.brand.profile.display_name }}</b><span class="muted">{{ c.created|timesince }} ago</span></div>
       </div>
       <h3>{{ c.title }}</h3>
@@ -44,7 +44,7 @@
   </div>
   {% endif %}
   {% if not page.object_list %}
-  <div class="empty empty-card"><h3>No campaigns here yet.</h3><p>Try another niche, or check back soon. Brands post new work often.</p><a class="btn btn-ghost" href="?">See all campaigns</a></div>
+  <div class="empty empty-card"><h3>No campaigns here yet.</h3><p>The brands are still "aligning internally". Try another niche, or check back soon.</p><a class="btn btn-ghost" href="?">See all campaigns</a></div>
   {% endif %}
   {% if page.paginator.num_pages > 1 %}
   <nav class="pager" aria-label="Pages">

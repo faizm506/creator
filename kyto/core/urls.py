@@ -35,6 +35,7 @@ urlpatterns = [
     path("reset/<uidb64>/<token>/", auth_views.PasswordResetConfirmView.as_view(
         template_name="registration/reset_confirm.html", success_url=reverse_lazy("password_reset_complete")),
         name="password_reset_confirm"),
+    path("api/unread/", views.unread_count, name="unread_count"),
     path("robots.txt", views.robots, name="robots"),
     path("humans.txt", views.humans, name="humans"),
     path("password/", throttle("pwd", 8)(PasswordChange.as_view()), name="password"),

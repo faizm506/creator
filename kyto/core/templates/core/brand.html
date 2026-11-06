@@ -5,7 +5,7 @@
 <div class="cover {{ p.avatar_class }}" aria-hidden="true"></div>
 <section class="wrap pf">
   <header class="pf-head">
-    <span class="avatar avatar-xl {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+    <span class="ring ring-xl{% if p.is_brand %} brand{% endif %}{% if p.verified %} vr{% endif %}" aria-hidden="true"><span class="avatar avatar-xl {{ p.avatar_class }}">{{ p.initial }}</span></span>
     <div class="pf-id">
       <h1>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" with big=1 %}{% endif %}</h1>
       <p class="muted">@{{ p.handle }}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</p>

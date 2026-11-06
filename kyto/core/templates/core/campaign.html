@@ -30,7 +30,7 @@
       <div class="panel-head"><h2>Proposals ({{ proposals|length }})</h2>
         {% if c.is_open %}<form method="post" action="{% url 'campaign_close' c.pk %}" data-confirm="Close this campaign? Creators won't be able to send proposals.">{% csrf_token %}<button class="btn btn-quiet">Close campaign</button></form>{% endif %}</div>
       <p class="fine fine-top">Creators send you their own price. Accept the one that suits you, or open the chat to ask questions first.</p>
-      <div class="applicants">
+      <div class="applicants" data-region="proposals">
         {% for o in proposals %}
         {% with p=o.creator.profile %}
         <article class="acard">

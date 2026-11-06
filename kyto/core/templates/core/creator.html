@@ -5,7 +5,7 @@
 <div class="cover {{ p.avatar_class }}" aria-hidden="true"></div>
 <section class="wrap pf">
   <header class="pf-head">
-    <span class="avatar avatar-xl {{ p.avatar_class }}" aria-hidden="true">{{ p.initial }}</span>
+    <span class="ring ring-xl{% if p.is_brand %} brand{% endif %}{% if p.verified %} vr{% endif %}" aria-hidden="true"><span class="avatar avatar-xl {{ p.avatar_class }}">{{ p.initial }}</span></span>
     <div class="pf-id">
       <h1>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" with big=1 %}{% endif %}</h1>
       <p class="muted">@{{ p.handle }}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</p>
@@ -42,7 +42,7 @@
         {% elif is_owner %}
         <div class="empty"><h3>Show brands your best work.</h3><p>Add up to 6 reels. Three reels earn you 10 score points.</p><a class="btn btn-primary" href="{% url 'settings' %}#showcase">Add your first reel</a></div>
         {% else %}
-        <div class="empty"><p>No reels showcased yet. See the latest on Instagram.</p></div>
+        <div class="empty"><p>No reels here yet. The algorithm is waiting. See the latest on Instagram.</p></div>
         {% endif %}
       </section>
 
@@ -78,7 +78,7 @@
           </svg>
           <div class="ring-num"><b>{{ p.rank_score }}</b><span>out of 100</span></div>
         </div>
-        <p class="top-pct">Top {{ info.top_pct }}% of {{ info.total }} creators</p>
+        <p class="top-pct">{% if info.total < 10 %}Founding creator. You got here early.{% else %}Top {{ info.top_pct }}% of {{ info.total }} creators{% endif %}</p>
         <div class="tiles">
           <div><b>#{{ info.overall }}</b><span>Overall</span></div>
           <div><b>{% if info.city %}#{{ info.city }}{% else %}–{% endif %}</b><span>{% if p.city %}{{ p.city }}{% else %}City{% endif %}</span></div>

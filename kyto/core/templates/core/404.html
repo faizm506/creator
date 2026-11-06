@@ -1,6 +1,10 @@
 {% extends "core/base.html" %}
+{% block title %}Page not found · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<section class="wrap auth"><h1>We can't find that page.</h1>
-<p class="lead-s">The link may be old, or the profile may have changed its handle.</p>
-<a class="btn btn-primary" href="{% url 'leaderboard' %}">Go to the leaderboard</a></section>
+<section class="wrap auth auth-wide center">
+  <div class="meme"><p class="top">One does not simply</p><p class="mid">&macr;\_(&#12484;)_/&macr;</p><p class="bottom">Walk into a page that doesn't exist</p></div>
+  <h1 class="h-404">This page went out for chai and never came back.</h1>
+  <p class="lead-s">The link may be old, or the profile may have changed its handle.</p>
+  <div class="cta cta-center"><a class="btn btn-primary btn-lg" href="{% url 'home' %}">Take me home</a><a class="btn btn-ghost btn-lg" href="{% url 'leaderboard' %}">See the leaderboard</a></div>
+</section>
 {% endblock %}

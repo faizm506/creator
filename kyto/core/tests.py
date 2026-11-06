@@ -511,3 +511,73 @@ class HomeFeedTests(TestCase):
             page = self.client.get(url)
             self.assertContains(page, "kmark")
             self.assertNotContains(page, 'class="tick')
+
+
+class LiveAndFunTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.brand = make("livebrand", role="brand")
+        self.cr = make("livemaker", followers=3000, engagement=2)
+        self.o = Offer.objects.create(brand=self.brand.user, creator=self.cr.user, title="Live", deliverables="1 reel",
+                                      budget=5000, message="Hello first", status="accepted")
+
+    def _login(self, name):
+        self.client.login(username=name, password="pass-12345-xyz")
+
+    def test_chat_box_sends_json_without_reload(self):
+        self._login("livebrand")
+        r = self.client.post(reverse("message_send", args=[self.o.pk]), {"body": "Hi there"}, HTTP_X_KYTO="chat")
+        self.assertEqual(r.status_code, 200)
+        data = r.json()
+        self.assertTrue(data["ok"])
+        self.assertEqual(self.o.messages.get().pk, data["id"])
+
+    def test_chat_box_errors_are_json_too(self):
+        self._login("livebrand")
+        self.assertEqual(self.client.post(reverse("message_send", args=[self.o.pk]), {"body": "  "}, HTTP_X_KYTO="chat").status_code, 400)
+        Offer.objects.filter(pk=self.o.pk).update(status="declined")
+        r = self.client.post(reverse("message_send", args=[self.o.pk]), {"body": "late"}, HTTP_X_KYTO="chat")
+        self.assertEqual(r.status_code, 409)
+        self.assertFalse(r.json()["ok"])
+
+    def test_normal_form_post_still_redirects_for_no_javascript(self):
+        self._login("livebrand")
+        r = self.client.post(reverse("message_send", args=[self.o.pk]), {"body": "plain"})
+        self.assertEqual(r.status_code, 302)
+
+    def test_chat_page_gives_every_bubble_an_id_for_live_updates(self):
+        self._login("livemaker")
+        self.client.post(reverse("message_send", args=[self.o.pk]), {"body": "reply"})
+        page = self.client.get(reverse("offer", args=[self.o.pk]))
+        self.assertContains(page, 'data-id="0"')
+        self.assertContains(page, "data-chat")
+        self.assertContains(page, 'data-status="accepted"')
+
+    def test_unread_badge_endpoint(self):
+        self.assertEqual(self.client.get(reverse("unread_count")).status_code, 401)
+        self._login("livebrand")
+        self.client.post(reverse("message_send", args=[self.o.pk]), {"body": "from brand"})
+        self._login("livemaker")
+        r = self.client.get(reverse("unread_count"))
+        self.assertEqual(r.json()["count"], 1)
+        self.assertIn("no-store", r["Cache-Control"])
+
+    def test_private_pages_are_not_cached_by_the_browser(self):
+        self._login("livemaker")
+        for url in (reverse("inbox"), reverse("settings"), reverse("offer", args=[self.o.pk])):
+            self.assertIn("no-store", self.client.get(url)["Cache-Control"])
+
+    def test_404_is_a_meme(self):
+        r = self.client.get("/definitely-not-a-page/")
+        self.assertEqual(r.status_code, 404)
+        self.assertContains(r, "chai", status_code=404)
+        self.assertContains(r, "meme", status_code=404)
+
+    def test_niche_circles_have_icons_and_page_has_admin_hook_for_navigation(self):
+        page = self.client.get(reverse("home"))
+        self.assertContains(page, 'hl-circle"><svg')
+        self.assertContains(page, "data-admin=")
+
+    def test_inbox_and_proposals_are_live_regions(self):
+        self._login("livemaker")
+        self.assertContains(self.client.get(reverse("inbox")), 'data-region="threads"')

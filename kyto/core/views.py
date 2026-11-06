@@ -13,11 +13,14 @@ from django.core.paginator import Paginator
 from django.db import IntegrityError, transaction
 from django.db.models import Count, F, Q, Sum
 from django.core.cache import cache
-from django.http import FileResponse, Http404, HttpResponse, HttpResponseRedirect
+from django.http import FileResponse, Http404, HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
+
+from .context import inbox_total
 
 from .forms import (BoostForm, CampaignForm, OfferForm, PhotoForm, ProfileForm, ProposalForm, ReviewForm,
                     ShowcaseForm, SignupForm)
@@ -290,13 +293,14 @@ def _dash_stats(user, profile):
     return stats
 
 
+@never_cache
 @login_required
 def settings_view(request):
     profile = request.user.profile
     form = ProfileForm(request.POST or None, instance=profile)
     if request.method == "POST" and form.is_valid():
         form.save()
-        messages.success(request, "Profile saved.")
+        messages.success(request, "Saved. Your profile just got 3% more irresistible.")
         return redirect("settings")
     pending = request.user.boost_requests.filter(status=BoostRequest.PENDING).exists()
     return render(request, "core/settings.html", {
@@ -322,7 +326,7 @@ def showcase_add(request):
     else:
         _, made = ShowcasePost.objects.get_or_create(profile=p, code=form.code, defaults={"kind": form.kind})
         p.save()  # refresh score
-        messages.success(request, "Added to your showcase." if made else "That one is already in your showcase.")
+        messages.success(request, "Reel added. Instant glow-up." if made else "That one is already in your showcase.")
     return redirect(reverse("settings") + "#showcase")
 
 
@@ -397,7 +401,7 @@ def campaign_new(request):
         c = form.save(commit=False)
         c.brand = request.user
         c.save()
-        messages.success(request, "Campaign posted.")
+        messages.success(request, "Campaign posted. Now watch the proposals roll in (or at least one polite hello).")
         return redirect("campaign", pk=c.pk)
     return render(request, "core/campaign_form.html", {"form": form})
 
@@ -444,7 +448,7 @@ def campaign_apply(request, pk):
         brand=c.brand, creator=request.user, campaign=c, initiator="creator", title=c.title,
         deliverables=c.deliverables, budget=form.cleaned_data["budget"], message=form.cleaned_data["message"],
     )
-    messages.success(request, "Proposal sent. The brand will reply in your inbox.")
+    messages.success(request, "Proposal sent. Now we wait, like a group chat after \"we should totally meet up\".")
     return redirect("offer", pk=o.pk)
 
 
@@ -537,6 +541,7 @@ def _is_initiator(o, user):
     return ("brand" if user.pk == o.brand_id else "creator") == o.initiator
 
 
+@never_cache
 @login_required
 def offer_detail(request, pk):
     o = _offer_or_404(request, pk)
@@ -545,8 +550,8 @@ def offer_detail(request, pk):
     is_init = _is_initiator(o, request.user)
     other_user = o.creator if is_brand else o.brand
     other = other_user.profile
-    thread = [{"mine": is_init, "body": o.message, "at": o.created, "first": True}]
-    thread += [{"mine": m.sender_id == request.user.pk, "body": m.body, "at": m.created, "first": False}
+    thread = [{"id": 0, "mine": is_init, "body": o.message, "at": o.created, "first": True}]
+    thread += [{"id": m.pk, "mine": m.sender_id == request.user.pk, "body": m.body, "at": m.created, "first": False}
                for m in o.messages.all()]
     return render(request, "core/offer.html", {
         "o": o, "thread": thread, "is_brand": is_brand, "is_init": is_init, "other": other,
@@ -558,10 +563,10 @@ def offer_detail(request, pk):
 
 
 ACTION_MESSAGES = {
-    "accept": "Accepted. You can both see each other's WhatsApp number now.",
-    "decline": "Declined.",
-    "withdraw": "Withdrawn.",
-    "complete": "Marked as finished. You can now leave each other a review.",
+    "accept": "Deal! You can both see each other's WhatsApp number now. Try not to leave them on read.",
+    "decline": "Declined. Politely, we hope.",
+    "withdraw": "Withdrawn. We never saw anything.",
+    "complete": "Work finished. Time for honest reviews (be nice, but be true).",
 }
 
 
@@ -610,7 +615,7 @@ def review_add(request, pk):
         Review.objects.update_or_create(author=request.user, subject=subject, defaults={
             "offer": o, "rating": form.cleaned_data["rating"], "comment": form.cleaned_data["comment"].strip()})
         refresh_rating(subject)
-        messages.success(request, "Thank you! Your review is live.")
+        messages.success(request, "Review posted. Honesty looks good on you.")
     else:
         messages.error(request, next(iter(form.errors.values()))[0])
     return redirect(reverse("offer", args=[pk]) + "#review")
@@ -620,16 +625,24 @@ def review_add(request, pk):
 @require_POST
 @throttle("msg", limit=60, window=3600)
 def message_send(request, pk):
+    live = request.headers.get("X-Kyto") == "chat"  # sent from the chat box without a page reload
     o = _offer_or_404(request, pk)
     body = request.POST.get("body", "").strip()[:1000]
     if not o.is_open:
+        if live:
+            return JsonResponse({"ok": False, "error": "This chat is closed, so no new messages."}, status=409)
         messages.error(request, "This offer is closed, so new messages can't be sent.")
     elif body:
-        Message.objects.create(offer=o, sender=request.user, body=body)
+        m = Message.objects.create(offer=o, sender=request.user, body=body)
         o.save(update_fields=["updated"])
+        if live:
+            return JsonResponse({"ok": True, "id": m.pk})
+    elif live:
+        return JsonResponse({"ok": False, "error": "Type a message first."}, status=400)
     return redirect(reverse("offer", args=[pk]) + "#end")
 
 
+@never_cache
 @login_required
 def inbox(request):
     u = request.user
@@ -656,7 +669,7 @@ def inbox(request):
 
 def robots(request):
     body = ("User-agent: *\nDisallow: /inbox/\nDisallow: /offers/\nDisallow: /hire/\nDisallow: /settings/\n"
-            "Disallow: /go/\nDisallow: /reset/\nAllow: /\n")
+            "Disallow: /go/\nDisallow: /reset/\nDisallow: /api/\nAllow: /\n")
     return HttpResponse(body, content_type="text/plain")
 
 
@@ -736,4 +749,13 @@ def media_file(request, path):
     resp = FileResponse(open(full, "rb"), content_type="image/jpeg")
     resp["Cache-Control"] = "public, max-age=86400"
     resp["X-Content-Type-Options"] = "nosniff"
+    return resp
+
+
+def unread_count(request):
+    """Tiny JSON endpoint the page asks every few seconds so the inbox badge updates by itself."""
+    if not request.user.is_authenticated:
+        return JsonResponse({"count": 0}, status=401)
+    resp = JsonResponse({"count": inbox_total(request.user)})
+    resp["Cache-Control"] = "no-store"
     return resp

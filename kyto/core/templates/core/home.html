@@ -18,7 +18,7 @@
 
     <div class="stories hls" aria-label="Browse by niche">
       {% for k, label in niches %}
-      <a class="story" href="{% url 'leaderboard' %}?niche={{ k }}"><span class="hl-circle">{{ label|slice:":1" }}</span><span class="story-name">{{ label }}</span></a>
+      <a class="story" href="{% url 'leaderboard' %}?niche={{ k }}"><span class="hl-circle">{% include "core/_niche_icon.html" with k=k %}</span><span class="story-name">{{ label }}</span></a>
       {% endfor %}
     </div>
 
@@ -31,7 +31,7 @@
     {% else %}
     <section class="welcome">
       <h2>Get found by the brands in your city.</h2>
-      <p>Free profiles, a public leaderboard, direct offers and chat.</p>
+      <p>Free. Yes, really. No catch (we checked twice).</p>
       <div class="welcome-btns"><a class="btn btn-lg btn-light" href="{% url 'signup' %}">Join free</a><a class="btn btn-lg btn-clear" href="{% url 'login' %}">Sign in</a></div>
     </section>
     {% endif %}
@@ -45,7 +45,7 @@
 
     {% for item in items %}{% include "core/_feed_card.html" %}
     {% empty %}
-    <div class="empty empty-card"><h3>Nothing here yet.</h3><p>Be the first to join and appear in the feed.</p><a class="btn btn-primary" href="{% url 'signup' %}">Join free</a></div>
+    <div class="empty empty-card"><h3>Nothing here yet.</h3><p>Main character energy is available. Be the first to join.</p><a class="btn btn-primary" href="{% url 'signup' %}">Join free</a></div>
     {% endfor %}
 
     <p class="feed-end">
