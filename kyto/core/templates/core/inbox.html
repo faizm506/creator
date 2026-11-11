@@ -1,32 +1,22 @@
 {% extends "core/base.html" %}
-{% load core_extras %}
-{% block title %}Inbox · {{ SITE_NAME }}{% endblock %}
+{% block title %}Messages · {{ SITE_NAME }}{% endblock %}
+{% block bodyclass %} inbox-page{% endblock %}
 {% block content %}
-<section class="wrap narrow inbox">
-  <h1>Inbox</h1>
-  <p class="lead-s">{% if user.profile.role == "brand" %}Your offers and the replies.{% else %}Offers from brands and your chats.{% endif %}</p>
-  <div class="chips">
-    <a class="chip{% if not f %} on{% endif %}" href="?">All</a>
-    <a class="chip{% if f == 'pending' %} on{% endif %}" href="?s=pending">Waiting</a>
-    <a class="chip{% if f == 'active' %} on{% endif %}" href="?s=active">Working</a>
-    <a class="chip{% if f == 'closed' %} on{% endif %}" href="?s=closed">Finished</a>
-  </div>
-  <div class="threads" data-region="threads">
-    {% for o, other, unread, preview in items %}
-    <a class="thread{% if unread %} unread{% endif %}" href="{% url 'offer' o.pk %}">
-      <span class="ring ring-s{% if other.is_brand %} brand{% endif %}{% if other.verified %} vr{% endif %}" aria-hidden="true"><span class="avatar {{ other.avatar_class }}">{{ other.initial }}</span></span>
-      <span class="thread-main">
-        <span class="thread-top"><b>{{ other.display_name }}</b><time class="muted">{{ o.updated|timesince }}</time></span>
-        <span class="thread-title">{{ o.title }} · {{ o.budget|rupees }}</span>
-        <span class="thread-prev muted">{{ preview|truncatechars:70 }}</span>
-      </span>
-      <span class="thread-end">{% if unread %}<span class="badge-n">{{ unread }}</span>{% endif %}<span class="pill pill-{{ o.status }}">{{ o.get_status_display }}</span></span>
-    </a>
-    {% empty %}
-    <div class="empty empty-card"><h3>Crickets. Even your spam folder is jealous.</h3>
-      <p>{% if user.profile.role == "brand" %}Find a creator and send your first offer.{% else %}When a brand sends you an offer, it shows up here. Add your best reels to get noticed.{% endif %}</p>
-      <a class="btn btn-primary" href="{% if user.profile.role == 'brand' %}{% url 'leaderboard' %}{% else %}{% url 'settings' %}#showcase{% endif %}">{% if user.profile.role == "brand" %}Find creators{% else %}Add my reels{% endif %}</a></div>
-    {% endfor %}
+<section class="dm dm-inbox">
+  <aside class="dm-list" aria-label="Your chats">
+    <div class="dm-head"><h1>Messages</h1></div>
+    <div class="chips dm-chips">
+      <a class="chip{% if not f %} on{% endif %}" href="?">All</a>
+      <a class="chip{% if f == 'pending' %} on{% endif %}" href="?s=pending">Waiting</a>
+      <a class="chip{% if f == 'active' %} on{% endif %}" href="?s=active">Working</a>
+      <a class="chip{% if f == 'closed' %} on{% endif %}" href="?s=closed">Finished</a>
+    </div>
+    <div class="threads" data-region="threads" data-src="{% url 'inbox' %}?partial=1&amp;s={{ f }}">{% include "core/_threads.html" %}</div>
+  </aside>
+  <div class="dm-empty">
+    <span class="dm-empty-ic" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg></span>
+    <h2>Your messages</h2>
+    <p>{% if user.profile.role == "brand" %}Send an offer to a creator, or reply to a proposal.{% else %}Pick a chat on the left, or wait for a brand to send you an offer.{% endif %}</p>
   </div>
 </section>
 {% endblock %}

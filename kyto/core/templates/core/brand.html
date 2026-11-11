@@ -2,24 +2,26 @@
 {% load core_extras %}
 {% block title %}{{ p.display_name }} · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<div class="cover {{ p.avatar_class }}" aria-hidden="true"></div>
-<section class="wrap pf">
-  <header class="pf-head">
-    <span class="ring ring-xl{% if p.is_brand %} brand{% endif %}{% if p.verified %} vr{% endif %}" aria-hidden="true"><span class="avatar avatar-xl {{ p.avatar_class }}">{{ p.initial }}</span></span>
-    <div class="pf-id">
-      <h1>{{ p.display_name }}{% if p.verified %}{% include "core/_kmark.html" with big=1 %}{% endif %}</h1>
-      <p class="muted">@{{ p.handle }}{% if p.niche %} · {{ p.get_niche_display }}{% endif %}{% if p.city %} · {{ p.city }}{% endif %}</p>
+<section class="wrap pf theme-brand">
+  <header class="ig-head">
+    <span class="ring ring-xl brand" aria-hidden="true"><span class="avatar avatar-xl {{ p.avatar_class }}">{{ p.initial }}</span></span>
+    <div class="ig-main">
+      <div class="ig-row">
+        <h1 class="ig-user">{{ p.handle }}{% if p.verified %}{% include "core/_kmark.html" with big=1 %}{% endif %}</h1>
+        {% include "core/_profile_actions.html" %}
+      </div>
+      <ul class="ig-stats">
+        <li><b>{% if p.rating_count %}★ {{ p.rating_avg|floatformat:1 }}{% else %}New{% endif %}</b> rating</li>
+        <li><b>{{ p.deals_done }}</b> jobs</li>
+        <li><b>#{{ info.overall }}</b> rank</li>
+      </ul>
     </div>
-    <div class="pf-actions">
-      {% include "core/_hire_btn.html" %}
-      <a class="btn btn-ghost" href="{% url 'go' p.handle %}" target="_blank" rel="noopener noreferrer">Instagram</a>
-      {% if can_contact %}<a class="btn btn-ghost" href="https://wa.me/{{ p.whatsapp|cut:'+' }}" target="_blank" rel="noopener noreferrer">WhatsApp</a>{% endif %}
-      <button type="button" class="btn btn-ghost" data-copy>Copy link</button>
-      {% if is_owner %}<a class="btn btn-quiet" href="{% url 'settings' %}">Edit</a>{% endif %}
+    <div class="ig-bio">
+      <p class="ig-name"><b>{{ p.display_name }}</b> <span class="role-tag">Brand</span>{% if p.niche or p.city %} <span class="muted">· {{ p.get_niche_display }}{% if p.niche and p.city %} · {% endif %}{{ p.city }}</span>{% endif %}</p>
+      {% if p.bio %}<p class="bio">{{ p.bio }}</p>{% endif %}
+      {% if badges %}<ul class="badges">{% for b in badges %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
     </div>
   </header>
-  {% if badges %}<ul class="badges">{% for b in badges %}<li>{{ b }}</li>{% endfor %}</ul>{% endif %}
-  {% if p.bio %}<p class="bio">{{ p.bio }}</p>{% endif %}
 
   <div class="pf-grid">
     <div class="pf-main">
@@ -70,6 +72,7 @@
 
     <aside class="pf-side">
       <section class="panel score-panel">
+        <p class="muted">Level {{ level.n }} · {{ level.name }}</p>
         <p class="muted">Creator rating</p>
         <p class="big-rating">{% if p.rating_count %}{{ p.rating_avg|floatformat:1 }}{% else %}New{% endif %}</p>
         {% if p.rating_count %}<p class="stars big-stars" aria-hidden="true">{{ p.rating_avg|stars }}</p><p class="muted">{{ p.rating_count }} review{{ p.rating_count|pluralize }}</p>{% else %}<p class="muted">No reviews yet</p>{% endif %}
@@ -79,19 +82,11 @@
           <div><b>{{ p.deals_done }}</b><span>Jobs done</span></div>
         </div>
       </section>
-
       {% if p.verified %}
-      <section class="verify-card ok"><span class="kmark kmark-xl" aria-hidden="true"></span>
+      <section class="verify-card ok">{% include "core/_kmark.html" with big=1 %}
         <div><b>Verified shop</b><span>We checked that this shop is real{% if p.verified_at %} on {{ p.verified_at|date:"j M Y" }}{% endif %}.</span></div></section>
       {% else %}
       <section class="verify-card"><div><b>Not verified yet</b><span>Verified shops are ones we've checked are real.{% if is_owner %} <a href="{% url 'settings' %}#verify">Request verification</a>{% endif %}</span></div></section>
-      {% endif %}
-
-      {% if user.is_authenticated and user.profile.role == "creator" %}
-      <section class="panel hire-panel"><h3>Want to work with {{ p.display_name }}?</h3><p>Send a pitch with your price. They reply in your inbox.</p>
-        <a class="btn btn-primary btn-block" href="{% url 'offer_new' p.handle %}">Pitch this brand</a></section>
-      {% elif not user.is_authenticated %}
-      <section class="join-cta"><h3>Are you a creator?</h3><p>Join free, then send this brand a pitch with your price.</p><a class="btn btn-lg" href="{% url 'signup' %}">Join free</a></section>
       {% endif %}
     </aside>
   </div>

@@ -49,3 +49,20 @@ and loaded only when tapped, fixed-destination Instagram redirect (no open redir
 Brands upload up to 6 photos. They are checked, resized and re-saved as clean JPEGs into the `media/` folder
 (never served as anything else). On a host with a temporary disk (Render free, Heroku) uploads disappear on restart:
 attach a persistent disk, or move `MEDIA_ROOT` to object storage, before you go live.
+
+## Members only, and India-ready basics
+- **Sign-in wall:** like Instagram, you must sign in to look around. Only the sign-in pages, About and the legal pages are public.
+- **Consent:** signup needs "I am 18+" and "I agree to the Terms and Privacy Policy". The time and version are saved.
+  When you change the Terms or Privacy Policy, edit `TERMS_VERSION` in `config/settings.py`; every member is asked to accept again.
+- **Fill in `.env`:** `GRIEVANCE_NAME`, `GRIEVANCE_EMAIL`, `GRIEVANCE_ADDRESS`, `LEGAL_ENTITY`. Indian rules expect a named Grievance Officer with contact details.
+- **Your tools:** members can download their data and delete their account (Settings, Security) and report any profile, review or chat.
+  Reports appear in the admin under Reports. Aim to acknowledge within 24 hours and resolve within 15 days.
+- **Paid plans:** none are sold. The "Kyto Plus" page is only a waiting list. Before you charge anyone you need payment setup that follows RBI rules
+  (including e-mandates for recurring payments), GST invoices, a refund and cancellation policy, and updated Terms.
+- **Get a lawyer to review** the Terms, Privacy Policy and Guidelines before launch. They are plain-language drafts, not legal advice.
+
+## Chat and many people at once
+- The open chat asks a tiny JSON address every 2.5 seconds while active (5 seconds idle, slower when the tab is hidden), not the whole page.
+- Every message carries an id made by the browser, so a retry or a double press can never post twice.
+- SQLite is switched to WAL mode with a 20 second wait, which copes with many readers and one writer. For a busy site use Postgres.
+- "Typing…" is kept in memory, so run gunicorn with `--workers 1 --threads 8` (or add Redis later).

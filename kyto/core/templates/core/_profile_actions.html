@@ -1,0 +1,15 @@
+<div class="ig-actions">
+  {% if is_owner %}<a class="btn btn-ghost" href="{% url 'settings' %}">Edit profile</a>
+  {% else %}{% include "core/_hire_btn.html" %}
+  <form method="post" action="{% url 'kudos' p.handle %}" class="kudos-form">{% csrf_token %}<button class="icon-btn kudos-btn{% if i_kudosed %} on{% endif %}" aria-pressed="{% if i_kudosed %}true{% else %}false{% endif %}" aria-label="Give kudos"><svg viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z"/></svg><span class="kc">{{ p.kudos }}</span></button></form>{% endif %}
+  <button type="button" class="icon-btn" data-share="{% url 'creator' p.handle %}" data-title="{{ p.display_name }} on {{ SITE_NAME }}" aria-label="Share"><svg viewBox="0 0 24 24"><path d="M12 3v12M7.5 7.5L12 3l4.5 4.5M5 12v8h14v-8"/></svg></button>
+  <details class="menu more-inline" data-menu>
+    <summary class="icon-btn" aria-label="More options"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg></summary>
+    <div class="menu-pop">
+      <a href="{% url 'go' p.handle %}" target="_blank" rel="noopener noreferrer">Open Instagram</a>
+      {% if can_contact %}<a href="https://wa.me/{{ p.whatsapp|cut:'+' }}" target="_blank" rel="noopener noreferrer">WhatsApp</a>{% endif %}
+      <button type="button" class="menu-row" data-copy>Copy link</button>
+      {% if not is_owner %}<a class="menu-danger" href="{% url 'report' 'profile' p.pk %}">Report</a>{% endif %}
+    </div>
+  </details>
+</div>

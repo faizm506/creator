@@ -35,9 +35,6 @@
           <div><b>{{ p.views }}</b><span>Page views</span></div>
           <div><b>{% if p.is_brand %}{{ stats.campaigns }}{% else %}{{ p.ig_clicks }}{% endif %}</b><span>{% if p.is_brand %}Open campaigns{% else %}Instagram visits sent{% endif %}</span></div>
         </div>
-        <a class="inbox-card" href="{% url 'inbox' %}">
-          <div><b>{{ stats.waiting }} waiting for your answer</b><span>{{ stats.hired }} deal{{ stats.hired|pluralize }} so far · open your inbox</span></div><span class="chev">›</span>
-        </a>
         <div class="summary">
           <div><span class="muted">Score</span><b>{{ p.rank_score }}</b></div>
           <div class="grow"><span class="muted">{% if info.total < 10 %}Founding member. You got here early.{% else %}Top {{ info.top_pct }}% of {{ info.total }} {% if p.is_brand %}brands{% else %}creators{% endif %}{% endif %}</span>
@@ -142,6 +139,11 @@
           <li><div><b>WhatsApp privacy</b><span>{% if p.show_contact %}Shown to signed-in members{% else %}Shared only with someone whose offer you accept{% endif %}. Change it in Profile.</span></div></li>
           <li><div><b>Payments</b><span>Everything is free right now. We never ask for your UPI PIN, card or bank details.</span></div></li>
         </ul>
+        <div class="data-card">
+          <b>Your data, your call</b>
+          <p>You accepted our Terms and Privacy Policy (version {{ p.terms_version }}){% if p.terms_accepted_at %} on {{ p.terms_accepted_at|date:"j M Y" }}{% endif %}.</p>
+          <div class="data-btns"><a class="btn btn-ghost" href="{% url 'export_data' %}" download>Download my data</a><a class="btn btn-quiet" href="{% url 'privacy' %}">Privacy Policy</a><a class="btn btn-quiet" href="{% url 'grievance' %}">Grievance Officer</a></div>
+        </div>
         <details class="danger">
           <summary>Delete account</summary>
           <p>This permanently removes your profile, offers and messages. It can't be undone.</p>

@@ -1,0 +1,62 @@
+{% extends "core/base.html" %}
+{% block title %}Privacy Policy · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+{% firstof LEGAL_ENTITY "Zyrac" as owner %}
+<article class="wrap legal">
+  <p class="eyebrow">Version {{ TERMS_VERSION }}</p>
+  <h1>Privacy Policy</h1>
+  <div class="legal-box"><b>In short:</b> we collect only what {{ SITE_NAME }} needs to work. We never sell your data. We use no advertising or tracking cookies. You can download or delete your data any time. {{ SITE_NAME }} is for adults only (18+).</div>
+  <p>This policy explains how {{ owner }} ("we") handles personal data under the Digital Personal Data Protection Act, 2023 and other Indian law.</p>
+
+  <h2>1. What we collect</h2>
+  <ul>
+    <li><b>Account:</b> Instagram handle, email, and your password (stored only as a one-way hash, so nobody can read it).</li>
+    <li><b>Profile:</b> name, niche, city, about text, follower count and engagement rate you enter, your price, shop address and photos (brands), reel links, and a WhatsApp number if you choose to add one.</li>
+    <li><b>Activity:</b> offers, proposals, chat messages, reviews, kudos, daily check-ins and reports you make.</li>
+    <li><b>Technical:</b> IP address and basic device information in security logs, used to stop abuse and guessing of passwords.</li>
+    <li><b>Consent record:</b> that you confirmed you are 18+ and accepted these terms, and when.</li>
+  </ul>
+
+  <h2>2. Why we use it</h2>
+  <p>To run your account and profile, rank members, let members contact each other, keep the platform safe, send password-reset emails, handle reports and complaints, and follow the law. We do not use your data for advertising and we do not sell it.</p>
+
+  <h2>3. Your consent</h2>
+  <p>We process your data because you agreed when you joined. You can withdraw consent at any time by deleting your account (Settings, Security). Some data may be kept longer only where the law requires it.</p>
+
+  <h2>4. Who can see what</h2>
+  <ul>
+    <li>Your profile is visible only to <b>signed-in members</b>. It is not open to the public web.</li>
+    <li>Your <b>email is never shown</b> to other members.</li>
+    <li>Your <b>WhatsApp number</b> is shown only to a member whose offer you accept (or to all members if you turn that on).</li>
+    <li>Chats are visible only to the two people in them and to our moderators if a chat is reported.</li>
+  </ul>
+
+  <h2>5. Sharing</h2>
+  <p>We share data only with service providers who help us run the site (for example hosting and email delivery), and with authorities when the law requires. Instagram reels and Google Maps load <b>only when you tap them</b>; their own privacy policies then apply.</p>
+
+  <h2>6. Cookies and storage</h2>
+  <p>We use only essential cookies (to keep you signed in and to protect forms) and one setting saved on your device (text size). No advertising, analytics or tracking cookies.</p>
+
+  <h2>7. How long we keep it</h2>
+  <p>While your account is active. When you delete your account, your profile, offers, chats and reviews are removed. Short-lived security logs and backups are deleted on a regular cycle.</p>
+
+  <h2>8. Your rights</h2>
+  <ul>
+    <li><b>Access:</b> download your data from Settings, Security, "Download my data".</li>
+    <li><b>Correction:</b> edit your profile any time.</li>
+    <li><b>Erasure:</b> delete your account from Settings, Security.</li>
+    <li><b>Withdraw consent</b> by deleting your account.</li>
+    <li><b>Nominate</b> someone to use your rights if you die or cannot act, by writing to our Grievance Officer.</li>
+    <li><b>Complain</b> to us first (see <a href="{% url 'grievance' %}">Grievance Officer</a>). You may also approach the Data Protection Board of India.</li>
+  </ul>
+
+  <h2>9. Children</h2>
+  <p>{{ SITE_NAME }} is only for people aged 18 or over. If we learn that someone under 18 has joined, we delete the account and its data.</p>
+
+  <h2>10. Security</h2>
+  <p>We use hashed passwords, HTTPS, protected forms, sign-in lockouts, strict content rules in the browser and limited access to data. No system is perfectly safe. If a breach affects your data, we will tell you and the authorities as the law requires.</p>
+
+  <h2>11. Changes and contact</h2>
+  <p>If we change this policy we update the version date and ask you to accept again. Contact: <a href="{% url 'grievance' %}">Grievance Officer</a>.</p>
+</article>
+{% endblock %}

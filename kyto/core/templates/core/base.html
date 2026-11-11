@@ -7,58 +7,43 @@
   <title>{% block title %}{{ SITE_NAME }} · {{ TAGLINE }}{% endblock %}</title>
   <meta name="description" content="{{ SITE_NAME }}: where Ahmedabad's Instagram creators get ranked, found and hired by brands. Free to join.">
   <meta name="author" content="Zyrac">
-  <meta name="theme-color" content="#0071e3">
+  <meta name="theme-color" content="#ffffff">
   <link rel="icon" href="{% static 'core/favicon.svg' %}" type="image/svg+xml">
   <link rel="author" href="/humans.txt">
   <link rel="stylesheet" href="{% static 'core/css/app.css' %}">
   <script src="{% static 'core/js/app.js' %}" defer></script>
 </head>
-<body data-admin="{{ ADMIN_PATH }}">
+<body class="{% if user.is_authenticated %}app role-{{ ROLE }}{% else %}guest{% endif %}{% block bodyclass %}{% endblock %}" data-admin="{{ ADMIN_PATH }}">
 {% with u=request.resolver_match.url_name %}
-<div class="util"><div class="util-in">
-  <span class="util-left"><i class="dot"></i> Free to join while we launch</span>
-  <span class="util-links"><a href="{% url 'about' %}">About</a><a href="{% url 'how' %}" class="hide-s">How ranking works</a>
-    <button type="button" class="aa" data-textsize aria-pressed="false" aria-label="Make text bigger">Aa</button></span>
-</div></div>
+{% if user.is_authenticated %}
+<aside class="side" aria-label="Main menu">
+  <a class="logo" href="{% url 'home' %}"><span class="logo-mark" aria-hidden="true"></span><span class="logo-text">{{ SITE_NAME }}</span></a>
+  <nav class="side-nav">
+    <a class="nav-item{% if u == 'home' %} on{% endif %}" href="{% url 'home' %}"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg></span><span class="t">Home</span></a>
+    <a class="nav-item{% if u == 'leaderboard' %} on{% endif %}" href="{% url 'leaderboard' %}"><span class="ic"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg></span><span class="t">Explore</span></a>
+    <a class="nav-item{% if u == 'campaigns' or u == 'campaign' %} on{% endif %}" href="{% url 'campaigns' %}"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></span><span class="t">Campaigns</span></a>
+    <a class="nav-item{% if u == 'inbox' or u == 'offer' %} on{% endif %}" href="{% url 'inbox' %}" data-inbox-link><span class="ic"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg>{% if inbox_count %}<i class="badge-n nav-badge" data-inbox-badge>{{ inbox_count }}</i>{% endif %}</span><span class="t">Messages</span></a>
+    {% if ROLE == "brand" %}<a class="nav-item" href="{% url 'campaign_new' %}"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M12 8v8M8 12h8"/></svg></span><span class="t">Create</span></a>
+    {% else %}<a class="nav-item" href="{% url 'settings' %}#showcase"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M12 8v8M8 12h8"/></svg></span><span class="t">Create</span></a>{% endif %}
+    {% url 'creator' MY.handle as myurl %}
+    <a class="nav-item{% if request.path == myurl %} on{% endif %}" href="{{ myurl }}"><span class="ic"><span class="avatar {{ MY.avatar_class }}" aria-hidden="true">{{ MY.initial }}</span></span><span class="t">Profile</span></a>
+  </nav>
+  <div class="side-bottom">{% include "core/_more_menu.html" with place="side" %}</div>
+</aside>
 
-<header class="nav">
-  <div class="nav-in">
-    <a class="logo" href="{% url 'home' %}"><span class="logo-mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
-    <nav class="links" aria-label="Main">
-      <a href="{% url 'leaderboard' %}"{% if u == 'leaderboard' %} class="cur"{% endif %}>Leaderboard</a>
-      <a href="{% url 'campaigns' %}"{% if u == 'campaigns' or u == 'campaign' %} class="cur"{% endif %}>Campaigns</a>
-      <a href="{% url 'about' %}"{% if u == 'about' or u == 'how' %} class="cur"{% endif %}>About</a>
-      {% if BOOST_ENABLED %}<a href="{% url 'boost' %}"{% if u == 'boost' %} class="cur"{% endif %}>Boost</a>{% endif %}
-    </nav>
-    <div class="nav-end">
-      {% if user.is_authenticated %}
-        {% if user.profile.role == "brand" %}<a class="btn btn-primary btn-sm hide-xs" href="{% url 'campaign_new' %}">+ Post campaign</a>{% endif %}
-        <a class="icon-btn" href="{% url 'inbox' %}" aria-label="Inbox{% if inbox_count %}, {{ inbox_count }} waiting{% endif %}">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/></svg>
-          {% if inbox_count %}<i class="badge-n icon-n">{{ inbox_count }}</i>{% endif %}
-        </a>
-        <details class="menu" data-menu>
-          <summary class="menu-btn" aria-label="Account menu">
-            <span class="avatar av-sm {{ user.profile.avatar_class }}" aria-hidden="true">{{ user.profile.initial }}</span>
-            <span class="menu-name">{{ user.profile.display_name|truncatechars:14 }}</span>
-            <svg class="menu-chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-          </summary>
-          <div class="menu-pop">
-            <div class="menu-who"><b>{{ user.profile.display_name }}</b><span class="muted">@{{ user.profile.handle }} · {{ user.profile.get_role_display }}</span></div>
-            <a href="{% url 'creator' user.profile.handle %}">My public page</a>
-            <a href="{% url 'settings' %}">Dashboard &amp; settings</a>
-            <a href="{% url 'inbox' %}">Inbox{% if inbox_count %} ({{ inbox_count }}){% endif %}</a>
-            {% if user.profile.role == "brand" %}<a href="{% url 'campaign_new' %}">Post a campaign</a>{% endif %}
-            <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="menu-out">Sign out</button></form>
-          </div>
-        </details>
-      {% else %}
-        <a class="btn btn-ghost" href="{% url 'login' %}">Sign in</a>
-        <a class="btn btn-primary" href="{% url 'signup' %}">Join free</a>
-      {% endif %}
-    </div>
+<header class="topbar">
+  <a class="logo" href="{% url 'home' %}"><span class="logo-mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
+  <div class="top-actions">
+    <a class="icon-btn" href="{% url 'inbox' %}" data-inbox-link aria-label="Messages"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg>{% if inbox_count %}<i class="badge-n icon-n" data-inbox-badge>{{ inbox_count }}</i>{% endif %}</a>
+    {% include "core/_more_menu.html" with place="top" %}
   </div>
 </header>
+{% else %}
+<header class="guestbar">
+  <a class="logo" href="{% url 'home' %}"><span class="logo-mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
+  <div><a class="btn btn-ghost" href="{% url 'login' %}">Sign in</a><a class="btn btn-primary" href="{% url 'signup' %}">Join free</a></div>
+</header>
+{% endif %}
 
 {% if messages %}
 <div class="toasts" role="status" aria-live="polite">
@@ -66,38 +51,18 @@
 </div>
 {% endif %}
 
-<main>{% block content %}{% endblock %}</main>
+<main id="main">{% block content %}{% endblock %}</main>
 
-<footer class="foot">
-  <div class="wrap foot-grid">
-    <div><a class="logo" href="{% url 'home' %}"><span class="logo-mark" aria-hidden="true"></span>{{ SITE_NAME }}</a>
-      <p>{{ TAGLINE }} The leaderboard where Ahmedabad's Instagram creators and brands find each other.</p></div>
-    <div><h4>Explore</h4><a href="{% url 'leaderboard' %}">Leaderboard</a><a href="{% url 'campaigns' %}">Campaigns</a><a href="{% url 'how' %}">How ranking works</a><a href="{% url 'about' %}">About {{ SITE_NAME }}</a></div>
-    <div><h4>Join</h4><a href="{% url 'signup' %}">Create a free profile</a><a href="{% url 'login' %}">Sign in</a></div>
-    <div><h4>Trust</h4><span>Public ranking formula</span><span>Contacts shared only with consent</span>{% if SUPPORT_WHATSAPP %}<a href="https://wa.me/{{ SUPPORT_WHATSAPP }}" rel="noopener noreferrer">WhatsApp support</a>{% endif %}</div>
-  </div>
-  <div class="wrap foot-end">Rankings use numbers creators enter themselves. We mark checked profiles with a Kite Mark.</div>
-  <div class="credit">
-    <span class="credit-line"></span>
-    <a class="credit-in" href="{{ ZYRAC_URL }}" target="_blank" rel="noopener noreferrer" aria-label="Designed and built by Zyrac. Opens Zyrac on Instagram in a new tab.">
-      <span class="credit-small">Designed &amp; built by</span>
-      <span class="zyrac" aria-hidden="true"><b>Z</b><b>Y</b><b>R</b><b>A</b><b>C</b></span>
-      <span class="credit-ig" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.4" cy="6.6" r="1" class="dot-ig"/></svg>@zyrac__</span>
-    </a>
-    <span class="credit-line"></span>
-  </div>
-</footer>
-
+{% if user.is_authenticated %}
 <nav class="tabbar" aria-label="Quick navigation">
-  <a href="{% url 'home' %}"{% if u == 'home' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>Home</a>
-  <a href="{% url 'leaderboard' %}"{% if u == 'leaderboard' or u == 'creator' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Explore</a>
-  {% if not user.is_authenticated %}<a class="tab-plus" href="{% url 'signup' %}" aria-label="Join free"><span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>
-  {% elif user.profile.role == "brand" %}<a class="tab-plus" href="{% url 'campaign_new' %}" aria-label="Post a campaign"><span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>
-  {% else %}<a class="tab-plus" href="{% url 'settings' %}#showcase" aria-label="Add a reel"><span><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></span></a>{% endif %}
+  <a href="{% url 'home' %}"{% if u == 'home' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10"/></svg>Home</a>
+  <a href="{% url 'leaderboard' %}"{% if u == 'leaderboard' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Explore</a>
+  {% if ROLE == "brand" %}<a class="tab-plus" href="{% url 'campaign_new' %}"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M12 8v8M8 12h8"/></svg>Create</a>
+  {% else %}<a class="tab-plus" href="{% url 'settings' %}#showcase"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="5"/><path d="M12 8v8M8 12h8"/></svg>Create</a>{% endif %}
   <a href="{% url 'campaigns' %}"{% if u == 'campaigns' or u == 'campaign' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>Campaigns</a>
-  {% if user.is_authenticated %}<a href="{% url 'settings' %}"{% if u == 'settings' or u == 'password' or u == 'inbox' or u == 'offer' %} class="on"{% endif %}><span class="tab-av"><span class="avatar av-sm {{ user.profile.avatar_class }}" aria-hidden="true">{{ user.profile.initial }}</span>{% if inbox_count %}<i class="badge-n tab-n">{{ inbox_count }}</i>{% endif %}</span>Me</a>
-  {% else %}<a href="{% url 'login' %}"{% if u == 'login' or u == 'signup' %} class="on"{% endif %}><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>Sign in</a>{% endif %}
+  <a href="{{ myurl }}"{% if request.path == myurl %} class="on"{% endif %}><span class="tab-av"><span class="avatar {{ MY.avatar_class }}" aria-hidden="true">{{ MY.initial }}</span></span>Profile</a>
 </nav>
+{% endif %}
 {% endwith %}
 </body>
 </html>

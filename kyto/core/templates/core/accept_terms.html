@@ -1,0 +1,20 @@
+{% extends "core/base.html" %}
+{% block title %}Please accept the Terms · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap auth">
+  <h1>One quick thing</h1>
+  <p class="lead-s">Before you carry on, please confirm these. It takes five seconds and keeps everyone safe.</p>
+  <form method="post" class="group" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="consents">
+      <label class="check{% if form.adult.errors %} bad{% endif %}">{{ form.adult }}<span>I am 18 years or older.</span></label>
+      {% for e in form.adult.errors %}<small class="err">{{ e }}</small>{% endfor %}
+      <label class="check{% if form.agree.errors %} bad{% endif %}">{{ form.agree }}<span>I agree to the <a href="{% url 'terms' %}" target="_blank" rel="noopener">Terms</a> and the <a href="{% url 'privacy' %}" target="_blank" rel="noopener">Privacy Policy</a> (version {{ TERMS_VERSION }}).</span></label>
+      {% for e in form.agree.errors %}<small class="err">{{ e }}</small>{% endfor %}
+    </div>
+    <button class="btn btn-primary btn-block btn-lg">Agree and continue</button>
+  </form>
+  <form method="post" action="{% url 'logout' %}" class="center">{% csrf_token %}<button class="btn btn-quiet">I don't agree. Sign me out.</button></form>
+</section>
+{% endblock %}

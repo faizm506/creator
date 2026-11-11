@@ -1,4 +1,5 @@
 import math
+from datetime import timedelta
 
 from django.conf import settings
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
@@ -14,6 +15,8 @@ NICHES = [
     ("education", "Education"), ("gaming", "Gaming"), ("business", "Business"), ("other", "Other"),
 ]
 
+LEVELS = [(0, "Chai Tapri Regular"), (100, "Local Star"), (250, "Mohalla Celebrity"),
+          (500, "City Sensation"), (900, "Viral Vibes"), (1500, "Kyto Legend")]
 RANK_ORDER = ("-rank_score", "-followers", "created")  # score, then audience, then who joined first
 
 handle_validator = RegexValidator(r"^[a-z0-9._]{2,30}$", "Use 2–30 lowercase letters, numbers, dots or underscores.")
@@ -47,6 +50,14 @@ class Profile(models.Model):
     rating_count = models.PositiveIntegerField(default=0, editable=False)
     deals_done = models.PositiveIntegerField(default=0, editable=False)
     boost_until = models.DateTimeField(null=True, blank=True)
+    terms_version = models.CharField(max_length=20, blank=True, editable=False)
+    terms_accepted_at = models.DateTimeField(null=True, blank=True, editable=False)
+    adult_confirmed = models.BooleanField(default=False, editable=False)
+    streak = models.PositiveIntegerField(default=0, editable=False)
+    best_streak = models.PositiveIntegerField(default=0, editable=False)
+    last_checkin = models.DateField(null=True, blank=True, editable=False)
+    checkin_xp = models.PositiveIntegerField(default=0, editable=False)
+    kudos = models.PositiveIntegerField(default=0, editable=False)
     views = models.PositiveIntegerField(default=0, editable=False)
     ig_clicks = models.PositiveIntegerField(default=0, editable=False)
     boost_impressions = models.PositiveIntegerField(default=0, editable=False)
@@ -69,7 +80,7 @@ class Profile(models.Model):
 
     @property
     def avatar_class(self):
-        return f"av-{sum(ord(c) for c in self.handle) % 12}"
+        return f"{'bv' if self.is_brand else 'av'}-{sum(ord(c) for c in self.handle) % 12}"
 
     @property
     def initial(self):
@@ -119,6 +130,40 @@ class Profile(models.Model):
 
     def compute_score(self):
         return round(sum(v for _, v, _ in self.score_parts()), 1)
+
+    @property
+    def xp(self):
+        n = self.showcase.count() if self.pk else 0
+        return self.checkin_xp + self.deals_done * 50 + self.rating_count * 15 + n * 10 + self.completeness
+
+    def level_info(self):
+        """Fun level. It is only for show: it never changes your rank."""
+        xp = self.xp
+        lvl = max(i for i, (need, _) in enumerate(LEVELS) if xp >= need)
+        nxt = LEVELS[lvl + 1] if lvl + 1 < len(LEVELS) else None
+        pct = 100 if not nxt else int(100 * (xp - LEVELS[lvl][0]) / (nxt[0] - LEVELS[lvl][0]))
+        return {"n": lvl + 1, "name": LEVELS[lvl][1], "xp": xp, "pct": pct,
+                "next_name": nxt[1] if nxt else "", "to_next": (nxt[0] - xp) if nxt else 0}
+
+    @property
+    def streak_now(self):
+        today = timezone.localdate()
+        return self.streak if self.last_checkin and self.last_checkin >= today - timedelta(days=1) else 0
+
+    @property
+    def checked_in_today(self):
+        return self.last_checkin == timezone.localdate()
+
+    def check_in(self):
+        """Daily 'fly your kite' check-in. Returns False if already done today."""
+        today = timezone.localdate()
+        if self.last_checkin == today:
+            return False
+        self.streak = self.streak + 1 if self.last_checkin == today - timedelta(days=1) else 1
+        self.best_streak = max(self.best_streak, self.streak)
+        self.last_checkin = today
+        self.checkin_xp += 10 + min(self.streak, 7) * 2
+        return True
 
     @property
     def engaged_per_post(self):
@@ -267,9 +312,14 @@ class Message(models.Model):
     body = models.CharField(max_length=1000)
     created = models.DateTimeField(auto_now_add=True)
     read = models.BooleanField(default=False)
+    heart = models.BooleanField(default=False)
+    client_id = models.CharField(max_length=36, blank=True)  # set by the browser so a retry never posts twice
 
     class Meta:
-        ordering = ["created"]
+        ordering = ["created", "id"]
+        indexes = [models.Index(fields=["offer", "id"])]
+        constraints = [models.UniqueConstraint(fields=["sender", "client_id"], condition=~Q(client_id=""),
+                                               name="uniq_message_client_id")]
 
 
 class Review(models.Model):
@@ -300,6 +350,41 @@ def waiting_for(user):
     """Offers that are waiting for this person to answer."""
     return Offer.objects.filter(status=Offer.PENDING).filter(
         Q(brand=user, initiator="creator") | Q(creator=user, initiator="brand"))
+
+
+class Kudos(models.Model):
+    """A 'kudos' (like) from one member to a creator or brand. Cosmetic: it never changes rank."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="kudos_given")
+    profile = models.ForeignKey(Profile, on_delete=models.CASCADE, related_name="kudos_received")
+    created = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "profile"], name="one_kudos_per_pair")]
+
+
+class Report(models.Model):
+    """A complaint about a person, a review or a chat. Reviewed by a human in the admin."""
+    REASONS = [("spam", "Spam or scam"), ("fake", "Fake or misleading"), ("abuse", "Harassment or abuse"),
+               ("illegal", "Illegal or harmful content"), ("minor", "Involves someone under 18"),
+               ("ip", "Copyright or impersonation"), ("other", "Something else")]
+    reporter = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="reports_made")
+    profile = models.ForeignKey(Profile, null=True, blank=True, on_delete=models.CASCADE, related_name="reports")
+    review = models.ForeignKey("Review", null=True, blank=True, on_delete=models.SET_NULL)
+    offer = models.ForeignKey("Offer", null=True, blank=True, on_delete=models.SET_NULL)
+    reason = models.CharField(max_length=10, choices=REASONS)
+    details = models.CharField(max_length=500, blank=True)
+    resolved = models.BooleanField(default=False)
+    created = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["resolved", "-created"]
+
+
+class PlusInterest(models.Model):
+    """Someone who asked to hear about Kyto Plus when it exists. Nothing is charged."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="plus_interest")
+    created = models.DateTimeField(auto_now_add=True)
 
 
 class BoostRequest(models.Model):

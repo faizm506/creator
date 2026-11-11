@@ -6,7 +6,8 @@ from django.db import transaction
 from django.utils import timezone
 
 from .utils import throttle
-from .models import Application, BoostRequest, Campaign, Profile, Review, ShopPhoto, ShowcasePost, refresh_rating
+from .models import (Application, BoostRequest, Campaign, Kudos, PlusInterest, Profile, Report, Review, ShopPhoto,
+                     ShowcasePost, refresh_rating)
 
 
 @admin.register(Profile)
@@ -15,7 +16,8 @@ class ProfileAdmin(admin.ModelAdmin):
     list_filter = ("verify_requested", "verified", "role", "niche")
     search_fields = ("handle", "display_name", "user__email")
     list_editable = ("verified",)
-    readonly_fields = ("rank_score", "rating_avg", "rating_count", "deals_done", "verify_requested")
+    readonly_fields = ("rank_score", "rating_avg", "rating_count", "deals_done", "verify_requested", "terms_version",
+                       "terms_accepted_at", "adult_confirmed", "streak", "best_streak", "kudos")
 
     def save_model(self, request, obj, form, change):
         if obj.verified and not obj.verified_at:
@@ -92,3 +94,20 @@ class ReviewAdmin(admin.ModelAdmin):
 
 
 admin.site.register(ShopPhoto)
+
+
+@admin.register(Report)
+class ReportAdmin(admin.ModelAdmin):
+    list_display = ("created", "reason", "profile", "reporter", "resolved")
+    list_filter = ("resolved", "reason")
+    search_fields = ("profile__handle", "reporter__username", "details")
+    actions = ["mark_resolved"]
+
+    @admin.action(description="Mark selected reports as resolved")
+    def mark_resolved(self, request, queryset):
+        n = queryset.filter(resolved=False).update(resolved=True, resolved_at=timezone.now())
+        self.message_user(request, f"{n} report(s) resolved.", messages.SUCCESS)
+
+
+admin.site.register(PlusInterest)
+admin.site.register(Kudos)

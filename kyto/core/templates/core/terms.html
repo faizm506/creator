@@ -1,0 +1,52 @@
+{% extends "core/base.html" %}
+{% block title %}Terms of Use · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+{% firstof LEGAL_ENTITY "Zyrac" as owner %}
+<article class="wrap legal">
+  <p class="eyebrow">Version {{ TERMS_VERSION }}</p>
+  <h1>Terms of Use</h1>
+  <p class="lead-s">The rules of the road, in plain words. By using {{ SITE_NAME }} you agree to them.</p>
+
+  <h2>1. Who we are</h2>
+  <p>{{ SITE_NAME }} is run by {{ owner }}. It is a platform where Instagram creators and brands in India meet, rank themselves and talk. Under the Information Technology Act, 2000 we act as an intermediary: we host what members post, but we do not create it, and we are not a party to any deal between members.</p>
+
+  <h2>2. Who can join</h2>
+  <ul>
+    <li>You must be <b>18 or older</b>. {{ SITE_NAME }} is not for children.</li>
+    <li>Give true information, keep one account, and keep your password safe. You are responsible for what happens on your account.</li>
+  </ul>
+
+  <h2>3. Your content</h2>
+  <p>You own what you post (profile text, shop photos, reviews, messages). You allow us to store and show it inside {{ SITE_NAME }} so the service works. Post only what you have the right to post. Reels shown on a profile are loaded from Instagram and remain their owner's.</p>
+
+  <h2>4. What is not allowed</h2>
+  <p>No illegal content, scams, spam, harassment, hate, impersonation, fake numbers, fake or paid-for reviews, scraping, or attempts to break the site. No content that sexualises or endangers anyone, or involves a person under 18. The full list is in our <a href="{% url 'guidelines' %}">Community Guidelines</a>.</p>
+
+  <h2>5. Paid promotions must be disclosed</h2>
+  <p>If a brand pays or gives you something for a post, say so clearly (use Instagram's Paid partnership label, or #ad). Indian advertising and consumer rules require this, and you are responsible for following them.</p>
+
+  <h2>6. Offers, work and money</h2>
+  <p>Offers, proposals and chats are between members. {{ SITE_NAME }} does not hold money, pay anyone, check skills or promise results. Agree price, work and payment directly. Never pay anyone to "unlock" an offer, and never share an OTP, UPI PIN or card details. Disputes are between the members involved.</p>
+
+  <h2>7. Reviews, ranking and the Kite Mark</h2>
+  <p>Reviews are allowed only after a job is marked finished. Rankings follow the public formula on the <a href="{% url 'how' %}">How ranking works</a> page. Numbers such as followers are entered by members. The Kite Mark means we checked the details we asked for at the time, not that we guarantee the person or business. We may remove fake or abusive reviews.</p>
+
+  <h2>8. Reports, removal and suspension</h2>
+  <p>Anyone can report a profile, review or chat. We may remove content or suspend accounts that break these Terms or the law, and we will tell you why where we can. You can ask us to reconsider through our <a href="{% url 'grievance' %}">Grievance Officer</a>.</p>
+
+  <h2>9. Free service, and paid plans in future</h2>
+  <p>{{ SITE_NAME }} is free today. If we ever add paid plans, we will publish the price (with GST), how to cancel and our refund terms <i>before</i> you pay anything, and you will always be asked first.</p>
+
+  <h2>10. Limits of responsibility</h2>
+  <p>We work hard to keep {{ SITE_NAME }} running and safe, but it is provided "as is". To the extent the law allows, we are not responsible for losses from deals between members, content posted by members, or interruptions. Nothing here removes rights you have under Indian law that cannot be removed.</p>
+
+  <h2>11. Law and courts</h2>
+  <p>These Terms follow the laws of India. Courts at Ahmedabad, Gujarat have jurisdiction, without taking away any consumer right to go to another court where the law allows it.</p>
+
+  <h2>12. Changes</h2>
+  <p>When we change these Terms or the <a href="{% url 'privacy' %}">Privacy Policy</a> we update the version date above and ask you to accept again.</p>
+
+  <h2>13. Contact</h2>
+  <p>Questions or complaints: see the <a href="{% url 'grievance' %}">Grievance Officer</a> page.</p>
+</article>
+{% endblock %}

@@ -1,0 +1,19 @@
+<details class="menu more-{{ place }}" data-menu>
+  <summary class="nav-item more-btn" aria-label="More"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></span><span class="t more-label">More</span></summary>
+  <div class="menu-pop">
+    <div class="menu-who"><b>{{ MY.display_name }}</b><span class="muted">@{{ MY.handle }} · {{ MY.get_role_display }}</span></div>
+    <a href="{% url 'settings' %}">Dashboard &amp; settings</a>
+    <button type="button" class="menu-row" data-textsize aria-pressed="false">Bigger text</button>
+    <a href="{% url 'plus' %}">{{ SITE_NAME }} Plus (soon)</a>
+    <hr>
+    <a href="{% url 'about' %}">About {{ SITE_NAME }}</a>
+    <a href="{% url 'how' %}">How ranking works</a>
+    <a class="menu-legal" href="{% url 'guidelines' %}">Community Guidelines</a>
+    <a class="menu-legal" href="{% url 'terms' %}">Terms of Use</a>
+    <a class="menu-legal" href="{% url 'privacy' %}">Privacy Policy</a>
+    <a class="menu-legal" href="{% url 'grievance' %}">Grievance Officer</a>
+    <a class="menu-legal" href="{{ ZYRAC_URL }}" target="_blank" rel="noopener noreferrer">Made by Zyrac ↗</a>
+    <hr>
+    <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="menu-out">Sign out</button></form>
+  </div>
+</details>

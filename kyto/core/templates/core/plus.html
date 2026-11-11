@@ -1,0 +1,25 @@
+{% extends "core/base.html" %}
+{% block title %}{{ SITE_NAME }} Plus · coming soon{% endblock %}
+{% block content %}
+<section class="wrap narrow plus">
+  <p class="eyebrow">Coming soon (maybe)</p>
+  <h1>{{ SITE_NAME }} Plus</h1>
+  <p class="lead-s">Extra-fun features for people who love {{ SITE_NAME }}. Not live yet. Everything you use today stays free.</p>
+  <ul class="perk-grid">
+    <li><b>Fancy profile themes</b><span>Make your page look like you, not like everyone.</span></li>
+    <li><b>More reel slots</b><span>Show twelve reels instead of six.</span></li>
+    <li><b>Streak freeze</b><span>Miss a day, keep your streak. Life happens (so does chai).</span></li>
+    <li><b>Profile insights</b><span>See how many people visit and tap through, in numbers.</span></li>
+    <li><b>Early access</b><span>Try new features before everyone else.</span></li>
+  </ul>
+  <form method="post" action="{% url 'plus_toggle' %}" class="plus-join">
+    {% csrf_token %}
+    {% if interested %}<p class="notice done-note">You're on the list. We'll tell you before anything changes.</p>
+    <button class="btn btn-quiet">Leave the list</button>
+    {% else %}<button class="btn btn-primary btn-lg">Tell me when it's ready</button>{% endif %}
+  </form>
+  <div class="legal-box">
+    <b>Nothing is charged.</b> If we ever launch paid plans, we will show the full price (with GST), how to cancel and our refund terms <i>before</i> you pay anything. You will always be asked first, and you can cancel any time.
+  </div>
+</section>
+{% endblock %}

@@ -1,6 +1,9 @@
+import time
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.core import signing
 from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -13,7 +16,17 @@ User = get_user_model()
 
 def make(handle, role="creator", **kw):
     u = User.objects.create_user(handle, f"{handle}@x.com", "pass-12345-xyz")
+    kw.setdefault("terms_version", settings.TERMS_VERSION)
+    kw.setdefault("adult_confirmed", True)
     return Profile.objects.create(user=u, handle=handle, role=role, display_name=handle.title(), **kw)
+
+
+def signup_data(**kw):
+    d = {"role": "creator", "display_name": "Test Person", "username": "testperson", "email": "tp@x.com",
+         "password1": "S0me-long-pass-99", "password2": "S0me-long-pass-99", "adult": "on", "agree": "on",
+         "website": "", "ts": signing.dumps(int(time.time()) - 10)}
+    d.update(kw)
+    return d
 
 
 class RankingTests(TestCase):
@@ -58,8 +71,8 @@ class AccessTests(TestCase):
     def test_contact_hidden_from_anonymous(self):
         make("shy", whatsapp="919876543210", show_contact=True)
         r = self.client.get(reverse("creator", args=["shy"]))
-        self.assertNotContains(r, "919876543210")
-
+        self.assertEqual(r.status_code, 302)  # profiles are for signed-in members only
+        self.assertIn("/login/", r["Location"])
     def test_settings_requires_login(self):
         r = self.client.get(reverse("settings"))
         self.assertEqual(r.status_code, 302)
@@ -93,13 +106,10 @@ class ShowcaseTests(TestCase):
     def test_profile_page_counts_views_once_per_session(self):
         make("other")
         c = self.client_class()
+        c.login(username="reeler", password="pass-12345-xyz")
         c.get(reverse("creator", args=["other"]))
         c.get(reverse("creator", args=["other"]))
         self.assertEqual(Profile.objects.get(handle="other").views, 1)
-
-
-@override_settings(BOOST_ENABLED=True)
-class FairnessTests(TestCase):
     def _boosted(self, handle, **kw):
         kw.setdefault("bio", "x"); kw.setdefault("niche", "food"); kw.setdefault("followers", 5000)
         p = make(handle, **kw)
@@ -230,11 +240,12 @@ class HardeningTests(TestCase):
         r = self.client.get(reverse("signup"))
         self.assertContains(r, "Creator")
         self.assertContains(r, "Brand")
-        self.client.post(reverse("signup"), {
-            "role": "brand", "display_name": "Chai Corner", "username": "chaicorner", "email": "c@x.com",
-            "password1": "S0me-long-pass-99", "password2": "S0me-long-pass-99"})
-        self.assertEqual(Profile.objects.get(handle="chaicorner").role, "brand")
-
+        self.client.post(reverse("signup"), signup_data(role="brand", display_name="Chai Corner", username="chaicorner"))
+        p = Profile.objects.get(handle="chaicorner")
+        self.assertEqual(p.role, "brand")
+        self.assertTrue(p.adult_confirmed)
+        self.assertEqual(p.terms_version, settings.TERMS_VERSION)
+        self.assertIsNotNone(p.terms_accepted_at)
     def test_password_reset_does_not_reveal_accounts(self):
         make("known")
         a = self.client.post(reverse("password_reset"), {"email": "known@x.com"})
@@ -247,7 +258,7 @@ class HardeningTests(TestCase):
         self.assertContains(self.client.get("/humans.txt"), "Zyrac")
 
     def test_footer_credit_links_to_zyrac_instagram(self):
-        r = self.client.get(reverse("home"))
+        r = self.client.get(reverse("about"))  # About is public
         self.assertContains(r, 'href="https://www.instagram.com/zyrac__/"')
         self.assertContains(r, 'rel="noopener noreferrer"')
 
@@ -267,9 +278,9 @@ class PagesAndCampaignTests(TestCase):
         self.assertContains(r, "Zyrac")
 
     def test_campaign_list_and_detail_render(self):
+        self.client.login(username="makerx", password="pass-12345-xyz")
         self.assertContains(self.client.get(reverse("campaigns")), "Cafe reels")
         self.assertContains(self.client.get(reverse("campaign", args=[self.c.pk])), "2 reels")
-
     def test_apply_flow_and_owner_sees_proposal(self):
         self.client.login(username="makerx", password="pass-12345-xyz")
         self.client.post(reverse("campaign_apply", args=[self.c.pk]), {"budget": "8000", "message": "I love cafes"})
@@ -482,13 +493,18 @@ class HomeFeedTests(TestCase):
         Campaign.objects.create(brand=self.br.user, title="Monsoon menu launch", description="Taste and share",
                                 niche="food", city="Ahmedabad", budget=12000, deliverables="2 reels + 1 story")
 
-    def test_guest_home_loads_with_tabs_and_join_button(self):
+    def _in(self):
+        self.client.login(username="tastycafe", password="pass-12345-xyz")
+
+    def test_guests_are_sent_to_sign_in_and_members_see_tabs(self):
+        self.assertEqual(self.client.get(reverse("home")).status_code, 302)
+        self._in()
         r = self.client.get(reverse("home"))
         self.assertEqual(r.status_code, 200)
-        for word in ("For you", "Creators", "Brands", "Campaigns", "Join free"):
+        for word in ("For you", "Creators", "Brands", "Campaigns"):
             self.assertContains(r, word)
-
     def test_each_tab_shows_its_own_content(self):
+        self._in()
         self.assertContains(self.client.get(reverse("home") + "?feed=creators"), "Starmaker")
         self.assertNotContains(self.client.get(reverse("home") + "?feed=creators"), "Monsoon menu launch")
         self.assertContains(self.client.get(reverse("home") + "?feed=brands"), "Tastycafe")
@@ -496,10 +512,9 @@ class HomeFeedTests(TestCase):
         everything = self.client.get(reverse("home"))
         for word in ("Starmaker", "Tastycafe", "Monsoon menu launch"):
             self.assertContains(everything, word)
-
     def test_bad_feed_value_falls_back_to_for_you(self):
+        self._in()
         self.assertEqual(self.client.get(reverse("home") + "?feed=<script>").status_code, 200)
-
     def test_signed_in_home_has_dashboard_strip_and_plus_button(self):
         self.client.login(username="tastycafe", password="pass-12345-xyz")
         r = self.client.get(reverse("home"))
@@ -507,6 +522,7 @@ class HomeFeedTests(TestCase):
         self.assertContains(r, reverse("campaign_new"))  # brands get the + button for campaigns
 
     def test_verified_uses_kite_mark_not_a_blue_tick(self):
+        self._in()
         for url in (reverse("home"), reverse("creator", args=["starmaker"]), reverse("leaderboard")):
             page = self.client.get(url)
             self.assertContains(page, "kmark")
@@ -568,16 +584,460 @@ class LiveAndFunTests(TestCase):
             self.assertIn("no-store", self.client.get(url)["Cache-Control"])
 
     def test_404_is_a_meme(self):
+        self._login("livemaker")
         r = self.client.get("/definitely-not-a-page/")
         self.assertEqual(r.status_code, 404)
         self.assertContains(r, "chai", status_code=404)
         self.assertContains(r, "meme", status_code=404)
-
     def test_niche_circles_have_icons_and_page_has_admin_hook_for_navigation(self):
+        self._login("livemaker")
         page = self.client.get(reverse("home"))
         self.assertContains(page, 'hl-circle"><svg')
         self.assertContains(page, "data-admin=")
-
     def test_inbox_and_proposals_are_live_regions(self):
         self._login("livemaker")
         self.assertContains(self.client.get(reverse("inbox")), 'data-region="threads"')
+
+
+class LoginWallTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.cr = make("walluser", followers=1000)
+
+    def test_private_pages_send_guests_to_sign_in_and_remember_where_they_were(self):
+        for url in (reverse("home"), reverse("leaderboard"), reverse("campaigns"), reverse("creator", args=["walluser"]),
+                    reverse("inbox"), "/media/shops/x.jpg", reverse("go", args=["walluser"])):
+            r = self.client.get(url)
+            self.assertEqual(r.status_code, 302, url)
+            self.assertIn("/login/", r["Location"], url)
+        self.assertIn("next=", self.client.get(reverse("leaderboard"))["Location"])
+
+    def test_public_pages_stay_open(self):
+        for name in ("login", "signup", "about", "how", "terms", "privacy", "guidelines", "grievance", "password_reset"):
+            self.assertEqual(self.client.get(reverse(name)).status_code, 200, name)
+        self.assertEqual(self.client.get("/robots.txt").status_code, 200)
+
+    def test_api_answers_json_401_not_a_redirect(self):
+        r = self.client.get(reverse("unread_count"))
+        self.assertEqual(r.status_code, 401)
+
+    def test_members_get_through(self):
+        self.client.login(username="walluser", password="pass-12345-xyz")
+        self.assertEqual(self.client.get(reverse("leaderboard")).status_code, 200)
+
+
+class ConsentTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_member_who_has_not_accepted_current_terms_is_stopped_at_the_gate(self):
+        make("oldie", terms_version="1999-01-01")
+        self.client.login(username="oldie", password="pass-12345-xyz")
+        r = self.client.get(reverse("leaderboard"))
+        self.assertEqual(r.status_code, 302)
+        self.assertIn("/accept-terms/", r["Location"])
+        self.assertEqual(self.client.get(reverse("privacy")).status_code, 200)  # can still read the policy
+
+    def test_accepting_opens_the_gate_and_is_recorded(self):
+        make("oldie2", terms_version="1999-01-01")
+        self.client.login(username="oldie2", password="pass-12345-xyz")
+        self.client.post(reverse("accept_terms"), {"adult": "on", "agree": "on", "next": "/leaderboard/"})
+        p = Profile.objects.get(handle="oldie2")
+        self.assertEqual(p.terms_version, settings.TERMS_VERSION)
+        self.assertEqual(self.client.get(reverse("leaderboard")).status_code, 200)
+
+    def test_both_boxes_are_needed(self):
+        make("oldie3", terms_version="")
+        self.client.login(username="oldie3", password="pass-12345-xyz")
+        self.client.post(reverse("accept_terms"), {"agree": "on"})
+        self.assertEqual(Profile.objects.get(handle="oldie3").terms_version, "")
+
+    def test_accept_terms_does_not_redirect_to_other_sites(self):
+        make("oldie4", terms_version="")
+        self.client.login(username="oldie4", password="pass-12345-xyz")
+        r = self.client.post(reverse("accept_terms"), {"adult": "on", "agree": "on", "next": "https://evil.example/"})
+        self.assertEqual(r["Location"], "/")
+
+    def test_signup_needs_age_and_terms_boxes(self):
+        self.client.post(reverse("signup"), signup_data(adult=""))
+        self.client.post(reverse("signup"), signup_data(username="second", email="s@x.com", agree=""))
+        self.assertEqual(Profile.objects.count(), 0)
+
+    def test_signup_bot_traps(self):
+        self.client.post(reverse("signup"), signup_data(website="http://spam.example"))
+        self.client.post(reverse("signup"), signup_data(username="quick", email="q@x.com", ts=signing.dumps(int(time.time()))))
+        self.client.post(reverse("signup"), signup_data(username="forged", email="f@x.com", ts="not-a-real-token"))
+        self.assertEqual(Profile.objects.count(), 0)
+
+    def test_good_signup_works(self):
+        self.client.post(reverse("signup"), signup_data())
+        self.assertEqual(Profile.objects.get(handle="testperson").role, "creator")
+
+
+class LoginExperienceTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        make("loginuser")
+
+    def test_handle_can_be_typed_with_at_sign_and_capitals(self):
+        self.client.post(reverse("login"), {"username": "@LoginUser", "password": "pass-12345-xyz", "remember": "on"})
+        self.assertIn("_auth_user_id", self.client.session)
+
+    def test_unticked_keep_me_signed_in_ends_with_the_browser(self):
+        self.client.post(reverse("login"), {"username": "loginuser", "password": "pass-12345-xyz"})
+        self.assertTrue(self.client.session.get_expire_at_browser_close())
+
+    def test_ticked_keep_me_signed_in_lasts(self):
+        self.client.post(reverse("login"), {"username": "loginuser", "password": "pass-12345-xyz", "remember": "on"})
+        self.assertFalse(self.client.session.get_expire_at_browser_close())
+
+    def test_login_and_signup_pages_have_the_mascot_and_password_toggle(self):
+        for name in ("login", "signup"):
+            page = self.client.get(reverse(name))
+            self.assertContains(page, "Kyto the kite")
+            self.assertContains(page, "data-pw")
+            self.assertContains(page, "Sharma ji")
+
+
+class FunFeatureTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.me = make("funme")
+        self.you = make("funyou")
+        self.client.login(username="funme", password="pass-12345-xyz")
+
+    def test_checkin_builds_a_streak_once_a_day(self):
+        self.client.post(reverse("checkin"))
+        p = Profile.objects.get(handle="funme")
+        self.assertEqual((p.streak, p.checked_in_today), (1, True))
+        xp = p.checkin_xp
+        self.client.post(reverse("checkin"))
+        self.assertEqual(Profile.objects.get(handle="funme").checkin_xp, xp)  # no double XP
+
+    def test_streak_continues_after_yesterday_and_resets_after_a_gap(self):
+        today = timezone.localdate()
+        Profile.objects.filter(handle="funme").update(streak=4, last_checkin=today - timedelta(days=1))
+        self.client.post(reverse("checkin"))
+        self.assertEqual(Profile.objects.get(handle="funme").streak, 5)
+        Profile.objects.filter(handle="funme").update(streak=9, last_checkin=today - timedelta(days=3))
+        self.assertEqual(Profile.objects.get(handle="funme").streak_now, 0)
+        self.client.post(reverse("checkin"))
+        self.assertEqual(Profile.objects.get(handle="funme").streak, 1)
+
+    def test_level_rises_with_xp_and_never_changes_rank(self):
+        p = Profile.objects.get(handle="funme")
+        score = p.rank_score
+        low = p.level_info()["n"]
+        Profile.objects.filter(pk=p.pk).update(checkin_xp=2000)
+        p.refresh_from_db()
+        self.assertGreater(p.level_info()["n"], low)
+        p.save()
+        self.assertEqual(p.rank_score, score)
+
+    def test_kudos_toggle_json_and_count(self):
+        r = self.client.post(reverse("kudos", args=["funyou"]), HTTP_X_KYTO="json")
+        self.assertEqual(r.json(), {"ok": True, "on": True, "count": 1})
+        self.assertEqual(Profile.objects.get(handle="funyou").kudos, 1)
+        r = self.client.post(reverse("kudos", args=["funyou"]), HTTP_X_KYTO="json")
+        self.assertEqual(r.json()["count"], 0)
+
+    def test_cannot_give_yourself_kudos(self):
+        r = self.client.post(reverse("kudos", args=["funme"]), HTTP_X_KYTO="json")
+        self.assertEqual(r.status_code, 400)
+
+    def test_kudos_never_changes_rank_score(self):
+        before = Profile.objects.get(handle="funyou").rank_score
+        self.client.post(reverse("kudos", args=["funyou"]), HTTP_X_KYTO="json")
+        self.assertEqual(Profile.objects.get(handle="funyou").rank_score, before)
+
+    def test_plus_waiting_list_and_nothing_is_sold(self):
+        self.assertContains(self.client.get(reverse("plus")), "Nothing is charged")
+        self.client.post(reverse("plus_toggle"))
+        self.assertTrue(self.me.user.plus_interest)
+        self.client.post(reverse("plus_toggle"))
+        self.assertFalse(hasattr(User.objects.get(username="funme"), "plus_interest"))
+
+
+class SafetyAndLawTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.brand = make("lawbrand", role="brand")
+        self.cr = make("lawmaker")
+        self.o = Offer.objects.create(brand=self.brand.user, creator=self.cr.user, title="T", deliverables="d",
+                                      budget=5000, message="m", status="accepted")
+
+    def _login(self, name):
+        self.client.login(username=name, password="pass-12345-xyz")
+
+    def test_report_profile_and_chat(self):
+        from .models import Report
+        self._login("lawmaker")
+        self.client.post(reverse("report", args=["profile", self.brand.pk]), {"reason": "spam", "details": "Asks for money"})
+        self.client.post(reverse("report", args=["offer", self.o.pk]), {"reason": "abuse"})
+        self.assertEqual(Report.objects.count(), 2)
+        self.assertEqual(Report.objects.first().reporter.username, "lawmaker")
+
+    def test_cannot_report_yourself_or_a_chat_you_are_not_in(self):
+        from .models import Report
+        self._login("lawmaker")
+        self.assertEqual(self.client.get(reverse("report", args=["profile", self.cr.pk])).status_code, 404)
+        make("outsider")
+        self._login("outsider")
+        self.assertEqual(self.client.get(reverse("report", args=["offer", self.o.pk])).status_code, 404)
+        self.assertEqual(Report.objects.count(), 0)
+
+    def test_report_needs_a_reason(self):
+        from .models import Report
+        self._login("lawmaker")
+        self.client.post(reverse("report", args=["profile", self.brand.pk]), {"details": "x"})
+        self.assertEqual(Report.objects.count(), 0)
+
+    def test_export_has_my_data_and_nobody_elses_private_details(self):
+        self._login("lawmaker")
+        r = self.client.get(reverse("export_data"))
+        self.assertEqual(r.status_code, 200)
+        self.assertIn("attachment", r["Content-Disposition"])
+        body = r.content.decode()
+        self.assertIn("lawmaker@x.com", body)
+        self.assertNotIn("lawbrand@x.com", body)
+        self.assertNotIn("pbkdf2", body)  # no password hashes
+
+    def test_export_needs_sign_in(self):
+        self.assertEqual(self.client.get(reverse("export_data")).status_code, 302)
+
+    def test_legal_pages_carry_the_indian_basics(self):
+        self.assertContains(self.client.get(reverse("privacy")), "Digital Personal Data Protection Act, 2023")
+        self.assertContains(self.client.get(reverse("privacy")), "18")
+        self.assertContains(self.client.get(reverse("terms")), "Information Technology Act, 2000")
+        self.assertContains(self.client.get(reverse("terms")), "Paid partnership")
+        page = self.client.get(reverse("grievance"))
+        self.assertContains(page, "24 hours")
+        self.assertContains(page, "15 days")
+        self.assertContains(self.client.get(reverse("guidelines")), "#ad")
+
+    def test_every_page_links_to_terms_privacy_and_grievance(self):
+        page = self.client.get(reverse("about"))
+        for name in ("terms", "privacy", "guidelines", "grievance"):
+            self.assertContains(page, reverse(name))
+
+
+class InstagramShellTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.cr = make("themecr", followers=4000, engagement=3, verified=True)
+        self.br = make("themebr", role="brand", city="Ahmedabad", address="CG Road")
+        from .models import Campaign
+        Campaign.objects.create(brand=self.br.user, title="Theme test", description="d", budget=7000, deliverables="1 reel")
+
+    def _login(self, name):
+        self.client.login(username=name, password="pass-12345-xyz")
+
+    def test_members_get_sidebar_tabbar_and_no_footer_anywhere(self):
+        self._login("themecr")
+        for url in (reverse("home"), reverse("leaderboard"), reverse("campaigns"), reverse("inbox"), reverse("settings"),
+                    reverse("about"), reverse("creator", args=["themebr"])):
+            page = self.client.get(url)
+            self.assertContains(page, 'class="side"', msg_prefix=url)
+            self.assertContains(page, 'class="tabbar"', msg_prefix=url)
+            self.assertNotContains(page, "<footer", msg_prefix=url)
+
+    def test_guests_see_a_plain_header_and_no_footer(self):
+        for name in ("about", "login", "signup", "terms"):
+            page = self.client.get(reverse(name))
+            self.assertContains(page, "guestbar", msg_prefix=name)
+            self.assertNotContains(page, 'class="side"', msg_prefix=name)
+            self.assertNotContains(page, 'class="tabbar"', msg_prefix=name)
+            self.assertNotContains(page, "<footer", msg_prefix=name)
+
+    def test_menu_holds_settings_legal_credit_and_sign_out_once_each(self):
+        self._login("themecr")
+        page = self.client.get(reverse("home"))
+        for text in ("Dashboard", "Terms of Use", "Privacy Policy", "Grievance Officer", "Made by Zyrac", "Sign out", "Bigger text"):
+            self.assertContains(page, text)
+
+    def test_create_button_does_the_right_thing_for_each_role(self):
+        self._login("themecr")
+        self.assertContains(self.client.get(reverse("home")), "/settings/#showcase")
+        self._login("themebr")
+        self.assertContains(self.client.get(reverse("home")), reverse("campaign_new"))
+
+    def test_each_role_gets_its_own_colour_theme(self):
+        self._login("themecr")
+        self.assertContains(self.client.get(reverse("home")), "role-creator")
+        self._login("themebr")
+        self.assertContains(self.client.get(reverse("home")), "role-brand")
+
+    def test_brand_and_creator_avatars_use_different_palettes(self):
+        self.assertTrue(self.cr.avatar_class.startswith("av-"))
+        self.assertTrue(self.br.avatar_class.startswith("bv-"))
+        css = (settings.BASE_DIR / "core/static/core/css/app.css").read_text()
+        self.assertIn(".bv-0{", css)
+        self.assertIn(".av-0{", css)
+
+    def test_profile_pages_wear_the_right_theme_and_have_one_action_row(self):
+        self._login("themecr")
+        brand_page = self.client.get(reverse("creator", args=["themebr"]))
+        self.assertContains(brand_page, "theme-brand")
+        self.assertContains(brand_page, "ig-head")
+        self.assertContains(brand_page, "Open Instagram")
+        self.assertContains(brand_page, "/report/profile/")
+        self._login("themebr")
+        creator_page = self.client.get(reverse("creator", args=["themecr"]))
+        self.assertContains(creator_page, "theme-creator")
+        for gone in ("pf-bar", "hire-panel", "join-cta"):
+            self.assertNotContains(creator_page, gone)
+
+    def test_own_profile_shows_edit_not_report_or_kudos(self):
+        self._login("themecr")
+        page = self.client.get(reverse("creator", args=["themecr"]))
+        self.assertContains(page, "Edit profile")
+        self.assertNotContains(page, "/report/profile/")
+        self.assertNotContains(page, "kudos-form")
+
+    def test_feed_cards_are_coloured_by_who_they_are(self):
+        self._login("themecr")
+        page = self.client.get(reverse("home"))
+        self.assertContains(page, "fcard theme-creator")
+        self.assertContains(page, "fcard theme-brand")
+
+    def test_nothing_pulses_or_shines(self):
+        css = (settings.BASE_DIR / "core/static/core/css/app.css").read_text()
+        self.assertIn("animation-iteration-count:1!important", css)
+        self.assertIn(".kmark::before{display:none}", css)
+
+    def test_about_page_is_detailed(self):
+        page = self.client.get(reverse("about"))
+        for heading in ("Everything in one place", "How it works", "How ranking works", "Your privacy and safety",
+                        "Built in Ahmedabad", "Quick answers", "Meme corner", "Leaderboard", "Kite Mark", "Direct offers",
+                        "Live chat", "Honest reviews", "Streaks and levels"):
+            self.assertContains(page, heading)
+
+
+class ChatEngineTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.brand = make("chatbrand", role="brand")
+        self.cr = make("chatmaker")
+        self.o = Offer.objects.create(brand=self.brand.user, creator=self.cr.user, title="T", deliverables="d",
+                                      budget=5000, message="Hello first", status="accepted")
+
+    def _as(self, profile):
+        self.client.force_login(profile.user)
+
+    def _send(self, who, text, cid=None, offer=None):
+        self._as(who)
+        data = {"body": text}
+        if cid:
+            data["cid"] = cid
+        return self.client.post(reverse("message_send", args=[(offer or self.o).pk]), data, HTTP_X_KYTO="chat")
+
+    def _poll(self, who, after=0, offer=None):
+        self._as(who)
+        return self.client.get(reverse("offer_poll", args=[(offer or self.o).pk]) + f"?after={after}")
+
+    def test_the_text_that_was_typed_is_what_gets_saved(self):
+        r = self._send(self.brand, "When would you like to start?")
+        self.assertTrue(r.json()["ok"])
+        self.assertEqual(self.o.messages.get().body, "When would you like to start?")
+
+    def test_empty_message_is_refused_with_a_clear_reason(self):
+        r = self._send(self.brand, "   ")
+        self.assertEqual(r.status_code, 400)
+        self.assertEqual(r.json()["error"], "Type a message first.")
+        self.assertEqual(self.o.messages.count(), 0)
+
+    def test_a_retry_with_the_same_id_never_posts_twice(self):
+        a = self._send(self.brand, "Only once please", cid="abc-123").json()
+        b = self._send(self.brand, "Only once please", cid="abc-123").json()
+        self.assertEqual(a["id"], b["id"])
+        self.assertEqual(self.o.messages.count(), 1)
+
+    def test_send_answer_carries_time_and_day_label(self):
+        r = self._send(self.brand, "hi").json()
+        self.assertEqual(r["day"], "Today")
+        self.assertTrue(r["time"])
+
+    def test_poll_gives_only_new_messages_and_marks_them_read(self):
+        self._send(self.brand, "one")
+        self._send(self.brand, "two")
+        d = self._poll(self.cr).json()
+        self.assertEqual([m["body"] for m in d["messages"]], ["one", "two"])
+        self.assertFalse(any(m["mine"] for m in d["messages"]))
+        self.assertEqual(self._poll(self.cr, after=d["last"]).json()["messages"], [])
+        self.assertFalse(self.o.messages.filter(read=False).exists())
+
+    def test_sender_learns_when_the_other_person_has_read(self):
+        sent = self._send(self.brand, "did you see this?").json()
+        self.assertNotIn(sent["id"], self._poll(self.brand).json()["read"])
+        self._poll(self.cr)
+        self.assertIn(sent["id"], self._poll(self.brand).json()["read"])
+
+    def test_poll_reports_a_status_change_so_the_page_can_refresh(self):
+        Offer.objects.filter(pk=self.o.pk).update(status="completed")
+        self.assertEqual(self._poll(self.brand).json()["status"], "completed")
+
+    def test_typing_indicator_shows_for_the_other_person_only(self):
+        self._as(self.cr)
+        self.client.post(reverse("offer_typing", args=[self.o.pk]), HTTP_X_KYTO="json")
+        self.assertTrue(self._poll(self.brand).json()["typing"])
+        self.assertFalse(self._poll(self.cr).json()["typing"])
+
+    def test_hearts_work_for_received_messages_only(self):
+        m = self._send(self.brand, "great idea?").json()["id"]
+        self._as(self.brand)
+        own = self.client.post(reverse("message_heart", args=[self.o.pk, m]), HTTP_X_KYTO="json")
+        self.assertEqual(own.status_code, 400)
+        self._as(self.cr)
+        on = self.client.post(reverse("message_heart", args=[self.o.pk, m]), HTTP_X_KYTO="json").json()
+        self.assertTrue(on["heart"])
+        self.assertIn(m, self._poll(self.brand).json()["hearts"])
+        off = self.client.post(reverse("message_heart", args=[self.o.pk, m]), HTTP_X_KYTO="json").json()
+        self.assertFalse(off["heart"])
+
+    def test_outsiders_and_guests_get_nothing(self):
+        stranger = make("chatstranger")
+        self._as(stranger)
+        self.assertEqual(self.client.get(reverse("offer_poll", args=[self.o.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse("offer_typing", args=[self.o.pk]), HTTP_X_KYTO="json").status_code, 404)
+        self.assertEqual(self.client.post(reverse("message_send", args=[self.o.pk]), {"body": "hi"}, HTTP_X_KYTO="chat").status_code, 404)
+        self.client.logout()
+        self.assertEqual(self.client.get(reverse("offer_poll", args=[self.o.pk])).status_code, 302)
+
+    def test_many_chats_at_once_stay_separate_and_in_order(self):
+        pairs = []
+        for i in range(6):
+            b, c = make(f"mb{i}", role="brand"), make(f"mc{i}")
+            o = Offer.objects.create(brand=b.user, creator=c.user, title=f"T{i}", deliverables="d", budget=5000,
+                                     message="m", status="accepted")
+            pairs.append((b, c, o))
+        for n in range(10):
+            for i, (b, c, o) in enumerate(pairs):
+                self._send(b if n % 2 == 0 else c, f"o{i}-m{n}", cid=f"cid-{i}-{n}", offer=o)
+        for i, (b, c, o) in enumerate(pairs):
+            got = [m["body"] for m in self._poll(c, offer=o).json()["messages"]]
+            self.assertEqual(got, [f"o{i}-m{n}" for n in range(10)])
+
+    def test_polling_is_rate_limited_per_person(self):
+        self._as(self.cr)
+        url = reverse("offer_poll", args=[self.o.pk])
+        codes = {self.client.get(url).status_code for _ in range(95)}
+        self.assertIn(429, codes)
+
+    def test_chat_page_is_wired_for_live_updates(self):
+        self._as(self.cr)
+        page = self.client.get(reverse("offer", args=[self.o.pk]))
+        for needle in ('class="dm"', "data-poll=", "data-typing=", "data-hearts=", "chat-page", 'data-region="threads"', "data-jump"):
+            self.assertContains(page, needle)
+
+    def test_message_list_partial_is_only_the_rows(self):
+        self._as(self.cr)
+        r = self.client.get(reverse("inbox") + "?partial=1&cur=%d" % self.o.pk)
+        self.assertContains(r, "thread")
+        self.assertNotContains(r, "<html")
+        self.assertContains(r, 'aria-current="page"')
+
+    def test_the_browser_builds_the_message_before_clearing_the_box(self):
+        js = (settings.BASE_DIR / "core/static/core/js/app.js").read_text()
+        start = js.index("function sendMessage(form, retry)")
+        body = js[start:js.index("fetch(form.action", start)]
+        self.assertLess(body.index("new FormData(form)"), body.index('ta.value = ""'))

@@ -1,0 +1,35 @@
+{% extends "core/base.html" %}
+{% block title %}Grievance Officer · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+{% firstof LEGAL_ENTITY "Zyrac" as owner %}
+<article class="wrap legal">
+  <p class="eyebrow">Complaints and data requests</p>
+  <h1>Grievance Officer</h1>
+  <p class="lead-s">If something is wrong, tell us. A named person is responsible for answering you.</p>
+
+  {% if not GRIEVANCE_EMAIL %}<p class="notice err-box">Site owner: add GRIEVANCE_NAME and GRIEVANCE_EMAIL (and your address) in the .env file. Indian rules require a Grievance Officer's contact details to be shown here.</p>{% endif %}
+  <div class="legal-box officer">
+    <p><b>Name:</b> {{ GRIEVANCE_NAME|default:"Not added yet" }}</p>
+    <p><b>Email:</b> {% if GRIEVANCE_EMAIL %}<a href="mailto:{{ GRIEVANCE_EMAIL }}">{{ GRIEVANCE_EMAIL }}</a>{% else %}Not added yet{% endif %}</p>
+    {% if GRIEVANCE_PHONE %}<p><b>Phone:</b> {{ GRIEVANCE_PHONE }}</p>{% endif %}
+    <p><b>Address:</b> {{ GRIEVANCE_ADDRESS|default:"Ahmedabad, Gujarat, India" }}</p>
+    <p><b>Operated by:</b> {{ owner }}</p>
+  </div>
+
+  <h2>How to complain</h2>
+  <ul>
+    <li>For a profile, review or chat: press <b>Report</b> on it. It reaches our moderators.</li>
+    <li>For anything else (account, data, privacy, a decision we made): email the Grievance Officer above and include your handle.</li>
+  </ul>
+
+  <h2>How fast we respond</h2>
+  <ul>
+    <li>We acknowledge every complaint within <b>24 hours</b>.</li>
+    <li>We aim to resolve it within <b>15 days</b>.</li>
+    <li>Complaints about private images, nudity or someone impersonating a person are acted on within <b>24 hours</b>.</li>
+  </ul>
+
+  <h2>Data requests</h2>
+  <p>You can download or delete your data yourself in Settings, Security. For anything else, such as correcting data you cannot edit or nominating someone to use your rights, write to the Grievance Officer. See the <a href="{% url 'privacy' %}">Privacy Policy</a>.</p>
+</article>
+{% endblock %}

@@ -8,6 +8,7 @@
       <div><a href="{% url 'creator' r.author.profile.handle %}"><b>{{ r.author.profile.display_name }}</b></a><span class="muted">{{ r.updated|date:"j M Y" }}</span></div>
       <span class="stars" aria-label="{{ r.rating }} out of 5">{{ r.rating|stars }}</span></div>
     {% if r.comment %}<p>{{ r.comment }}</p>{% endif %}
+    {% if r.author_id != user.id %}<a class="review-report" href="{% url 'report' 'review' r.pk %}">Report</a>{% endif %}
   </article>
   {% empty %}
   <div class="empty"><p>No reviews yet. Be the first to say something nice (or at least true). Reviews only come after a finished job, so every one is real.</p></div>

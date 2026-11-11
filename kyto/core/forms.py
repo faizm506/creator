@@ -1,14 +1,17 @@
 import re
+import time
 
 from django import forms
 from django.conf import settings
+from django.core import signing
 from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import UserCreationForm
 from django.db import transaction
+from django.utils import timezone
 
 from .utils import process_image
 
-from .models import Offer, Application, BoostRequest, Campaign, Profile, ShowcasePost
+from .models import Offer, Application, BoostRequest, Campaign, Profile, Report, ShowcasePost
 
 User = get_user_model()
 
@@ -17,12 +20,16 @@ class SignupForm(UserCreationForm):
     email = forms.EmailField()
     display_name = forms.CharField(max_length=60, label="Name")
     role = forms.ChoiceField(choices=Profile.ROLES, widget=forms.RadioSelect, initial=Profile.CREATOR, label="I am a")
+    adult = forms.BooleanField(required=True, error_messages={"required": "Please confirm that you are 18 or older."})
+    agree = forms.BooleanField(required=True, error_messages={"required": "Please agree to the Terms and Privacy Policy to join."})
+    website = forms.CharField(required=False, widget=forms.TextInput(attrs={"tabindex": "-1", "autocomplete": "off"}))  # bot trap
+    ts = forms.CharField(required=False, widget=forms.HiddenInput)  # signed time the form was shown
 
     class Meta:
         model = User
         fields = ("username", "email")
 
-    field_order = ["role", "display_name", "username", "email", "password1", "password2"]
+    field_order = ["role", "display_name", "username", "email", "password1", "password2", "adult", "agree", "website", "ts"]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -30,6 +37,7 @@ class SignupForm(UserCreationForm):
         self.fields["username"].help_text = "Your Instagram username, without the @."
         self.fields["username"].widget.attrs.update(autocapitalize="none", autocomplete="username")
         self.fields["email"].widget.attrs["autocomplete"] = "email"
+        self.fields["ts"].initial = signing.dumps(int(time.time()))
         self.fields["role"].label = "I'm joining as"
         self.fields["display_name"].label = "Your name"
         self.fields["display_name"].widget.attrs["autocomplete"] = "name"
@@ -53,6 +61,18 @@ class SignupForm(UserCreationForm):
             raise forms.ValidationError("An account with this email already exists.")
         return e
 
+    def clean(self):
+        data = super().clean()
+        if data.get("website"):
+            raise forms.ValidationError("Something went wrong. Please try again.")
+        try:
+            shown = signing.loads(data.get("ts") or "", max_age=7200)
+        except signing.BadSignature:
+            raise forms.ValidationError("This form expired. Please try again.")
+        if time.time() - shown < 3:
+            raise forms.ValidationError("That was very quick! Please check your details and press the button again.")
+        return data
+
     @transaction.atomic
     def save(self, commit=True):
         user = super().save(commit=False)
@@ -62,6 +82,7 @@ class SignupForm(UserCreationForm):
         Profile.objects.create(
             user=user, handle=user.username, role=self.cleaned_data["role"],
             display_name=self.cleaned_data["display_name"],
+            terms_version=settings.TERMS_VERSION, terms_accepted_at=timezone.now(), adult_confirmed=True,
         )
         return user
 
@@ -219,3 +240,15 @@ class PhotoForm(forms.Form):
 
     def clean_image(self):
         return process_image(self.cleaned_data["image"])
+
+
+class ReportForm(forms.Form):
+    reason = forms.ChoiceField(choices=Report.REASONS, widget=forms.RadioSelect,
+                               error_messages={"required": "Please choose what is wrong."})
+    details = forms.CharField(max_length=500, required=False, label="Anything else we should know?",
+                              widget=forms.Textarea(attrs={"rows": 3, "maxlength": 500, "placeholder": "Optional. A few words help us act faster."}))
+
+
+class TermsForm(forms.Form):
+    adult = forms.BooleanField(required=True, error_messages={"required": "Please confirm that you are 18 or older."})
+    agree = forms.BooleanField(required=True, error_messages={"required": "Please agree to continue."})

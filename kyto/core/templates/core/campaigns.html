@@ -5,8 +5,7 @@
 <section class="wrap page-head">
   <div class="ph-row">
     <div><h1>Campaigns</h1><p class="lead-s">Real work from brands. Find one that fits you and apply.</p></div>
-    {% if user.is_authenticated and user.profile.role == "brand" %}<a class="btn btn-primary btn-lg" href="{% url 'campaign_new' %}">Post a campaign</a>
-    {% elif not user.is_authenticated %}<a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join as a brand</a>{% endif %}
+
   </div>
   <div class="chips" role="group" aria-label="Filter by niche">
     <a class="chip{% if not niche %} on{% endif %}" href="?sort={{ sort }}">All</a>

@@ -1,0 +1,20 @@
+{% extends "core/base.html" %}
+{% block title %}Report · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<section class="wrap auth">
+  <p class="muted"><a href="{{ back }}">‹ Back</a></p>
+  <h1>Report {{ label }}</h1>
+  <p class="lead-s">Tell us what is wrong. A real person will look at it, usually within a day.</p>
+  <form method="post" class="group" novalidate>
+    {% csrf_token %}
+    <fieldset class="reasons">
+      <legend>What is the problem?</legend>
+      {% for radio in form.reason %}<label class="reason" for="{{ radio.id_for_label }}">{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>{% endfor %}
+    </fieldset>
+    {% for e in form.reason.errors %}<small class="err">{{ e }}</small>{% endfor %}
+    {% include "core/_field.html" with field=form.details %}
+    <button class="btn btn-primary btn-block">Send report</button>
+  </form>
+  <p class="fine">Reports are private. The person is not told who reported them. If someone is in danger, contact the police (112) first.</p>
+</section>
+{% endblock %}

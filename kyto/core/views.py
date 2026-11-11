@@ -17,15 +17,17 @@ from django.http import FileResponse, Http404, HttpResponse, HttpResponseRedirec
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.formats import date_format
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
 from .context import inbox_total
 
-from .forms import (BoostForm, CampaignForm, OfferForm, PhotoForm, ProfileForm, ProposalForm, ReviewForm,
-                    ShowcaseForm, SignupForm)
-from .models import (NICHES, RANK_ORDER, BoostRequest, Campaign, Message, Offer, Profile, Review, ShopPhoto,
-                     ShowcasePost, refresh_rating, waiting_for)
+from .forms import (BoostForm, CampaignForm, OfferForm, PhotoForm, ProfileForm, ProposalForm, ReportForm,
+                    ReviewForm, ShowcaseForm, SignupForm, TermsForm)
+from .models import (NICHES, RANK_ORDER, BoostRequest, Campaign, Kudos, Message, Offer, PlusInterest, Profile, Report,
+                     Review, ShopPhoto, ShowcasePost, refresh_rating, waiting_for)
 from .utils import client_ip, hit, qr_svg, throttle, upi_link
 
 
@@ -35,6 +37,12 @@ def not_found(request, exception):
 
 def _creators():
     return Profile.objects.filter(role=Profile.CREATOR).select_related("user")
+
+
+def _back(request, default):
+    ref = request.META.get("HTTP_REFERER", "")
+    ok = ref and url_has_allowed_host_and_scheme(ref, allowed_hosts={request.get_host()})
+    return ref if ok else default
 
 
 def _brands():
@@ -92,6 +100,8 @@ def _mix(*groups, pattern=(0, 0, 1, 2)):
 
 
 def home(request):
+    if not request.user.is_authenticated:
+        return redirect("login")
     feed = request.GET.get("feed", "all")
     if feed not in ("all", "creators", "brands", "campaigns"):
         feed = "all"
@@ -118,11 +128,13 @@ def home(request):
             stories.append(creators[i])
         if i < len(brands[:4]) and i % 2 == 1:
             stories.append(brands[i])
-    me = request.user.profile if request.user.is_authenticated else None
+    me = request.user.profile
+    ids = [it["p"].id for it in items if it["kind"] in ("creator", "brand")]
+    kudosed = set(Kudos.objects.filter(user=request.user, profile_id__in=ids).values_list("profile_id", flat=True))
     return render(request, "core/home.html", {
         "feed": feed, "items": items, "stories": stories, "niches": [n for n in NICHES if n[0] != "other"],
-        "rail_creators": creators[:5], "rail_brands": brands[:3],
-        "me": me, "my_info": rank_info(me) if me else None,
+        "rail_creators": creators[:5], "rail_brands": brands[:3], "kudosed": kudosed,
+        "me": me, "my_info": rank_info(me), "level": me.level_info(),
     })
 
 
@@ -148,7 +160,19 @@ class LoginView(auth_views.LoginView):
         who = re.sub(r"[^a-z0-9._]", "", self.request.POST.get("username", "").strip().lower())[:40]
         return f"lf:ip:{client_ip(self.request)}", f"lf:u:{who}"
 
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        form.fields["username"].label = "Instagram handle"
+        form.fields["username"].widget.attrs.update(autocapitalize="none", autocorrect="off", spellcheck="false",
+                                                    autocomplete="username", autofocus=True)
+        form.fields["password"].widget.attrs.update(autocomplete="current-password")
+        return form
+
     def post(self, request, *args, **kwargs):
+        if "username" in request.POST:  # people type @Handle or capitals: that's fine
+            data = request.POST.copy()
+            data["username"] = data["username"].strip().lstrip("@").lower()
+            request.POST = data
         ip_key, user_key = self._keys()
         if cache.get(ip_key, 0) >= 15 or cache.get(user_key, 0) >= 8:
             messages.error(request, "Too many wrong tries. For your safety, wait 15 minutes or reset your password.")
@@ -162,7 +186,10 @@ class LoginView(auth_views.LoginView):
 
     def form_valid(self, form):
         cache.delete(self._keys()[1])
-        return super().form_valid(form)
+        resp = super().form_valid(form)
+        if not self.request.POST.get("remember"):
+            self.request.session.set_expiry(0)  # signed out when the browser closes
+        return resp
 
 
 def leaderboard(request):
@@ -234,6 +261,10 @@ def earned_badges(p, info):
             b.append("Rising star")
         if p.showcase.count() >= 3:
             b.append("Showcase ready")
+    if p.best_streak >= 7:
+        b.append(f"{p.best_streak}-day streak")
+    if p.kudos >= 10:
+        b.append("Kudos magnet")
     if p.completeness == 100:
         b.append("Complete profile")
     if p.is_boosted:
@@ -253,6 +284,7 @@ def creator_detail(request, handle):
     info = rank_info(p)
     ctx = {
         "p": p, "info": info, "badges": earned_badges(p, info), "is_owner": is_owner,
+        "level": p.level_info(), "i_kudosed": Kudos.objects.filter(user=request.user, profile=p).exists(),
         "reviews": Review.objects.filter(subject=p.user).select_related("author__profile")[:10],
         "can_contact": bool(p.whatsapp) and request.user.is_authenticated and (p.show_contact or _connected(request.user, p.user)),
     }
@@ -550,11 +582,14 @@ def offer_detail(request, pk):
     is_init = _is_initiator(o, request.user)
     other_user = o.creator if is_brand else o.brand
     other = other_user.profile
-    thread = [{"id": 0, "mine": is_init, "body": o.message, "at": o.created, "first": True}]
-    thread += [{"id": m.pk, "mine": m.sender_id == request.user.pk, "body": m.body, "at": m.created, "first": False}
-               for m in o.messages.all()]
+    msgs = list(o.messages.all())
+    thread = [{"id": 0, "mine": is_init, "body": o.message, "day": _day_label(o.created), "time": _clock(o.created),
+               "read": True, "heart": False, "first": True}]
+    thread += [{"id": m.pk, "mine": m.sender_id == request.user.pk, "body": m.body, "day": _day_label(m.created),
+                "time": _clock(m.created), "read": m.read, "heart": m.heart, "first": False} for m in msgs]
     return render(request, "core/offer.html", {
         "o": o, "thread": thread, "is_brand": is_brand, "is_init": is_init, "other": other,
+        "last_id": msgs[-1].pk if msgs else 0, "items": _inbox_items(request.user), "current": o.pk,
         "reveal": o.status in (Offer.ACCEPTED, Offer.COMPLETED) and bool(other.whatsapp),
         "my_review": Review.objects.filter(author=request.user, subject=other_user).first(),
         "their_review": Review.objects.filter(author=other_user, subject=request.user).first(),
@@ -621,22 +656,41 @@ def review_add(request, pk):
     return redirect(reverse("offer", args=[pk]) + "#review")
 
 
+def _day_label(dt):
+    d, today = timezone.localtime(dt).date(), timezone.localdate()
+    if d == today:
+        return "Today"
+    if d == today - timedelta(days=1):
+        return "Yesterday"
+    return date_format(d, "j F")
+
+
+def _clock(dt):
+    return date_format(timezone.localtime(dt), "g:i a")
+
+
 @login_required
 @require_POST
-@throttle("msg", limit=60, window=3600)
+@throttle("msg", limit=120, window=600)
 def message_send(request, pk):
     live = request.headers.get("X-Kyto") == "chat"  # sent from the chat box without a page reload
     o = _offer_or_404(request, pk)
     body = request.POST.get("body", "").strip()[:1000]
+    cid = re.sub(r"[^A-Za-z0-9-]", "", request.POST.get("cid", ""))[:36]
     if not o.is_open:
         if live:
             return JsonResponse({"ok": False, "error": "This chat is closed, so no new messages."}, status=409)
         messages.error(request, "This offer is closed, so new messages can't be sent.")
     elif body:
-        m = Message.objects.create(offer=o, sender=request.user, body=body)
-        o.save(update_fields=["updated"])
+        m = Message.objects.filter(offer=o, sender=request.user, client_id=cid).first() if cid else None
+        if m is None:  # a retry with the same cid finds the first copy instead of posting again
+            try:
+                m = Message.objects.create(offer=o, sender=request.user, body=body, client_id=cid)
+            except IntegrityError:
+                m = Message.objects.get(sender=request.user, client_id=cid)
+            Offer.objects.filter(pk=o.pk).update(updated=timezone.now())
         if live:
-            return JsonResponse({"ok": True, "id": m.pk})
+            return JsonResponse({"ok": True, "id": m.pk, "time": _clock(m.created), "day": _day_label(m.created)})
     elif live:
         return JsonResponse({"ok": False, "error": "Type a message first."}, status=400)
     return redirect(reverse("offer", args=[pk]) + "#end")
@@ -644,27 +698,82 @@ def message_send(request, pk):
 
 @never_cache
 @login_required
-def inbox(request):
-    u = request.user
-    f = request.GET.get("s", "")
-    qs = Offer.objects.filter(Q(brand=u) | Q(creator=u)).select_related("brand__profile", "creator__profile")
+def offer_poll(request, pk):
+    """Small, cheap answer the open chat asks every few seconds: new messages, who has read what, typing."""
+    me = request.user
+    if hit(f"poll:{me.pk}", 60) > 90:  # at most 90 checks a minute per person
+        return JsonResponse({"ok": False, "error": "slow down"}, status=429)
+    o = _offer_or_404(request, pk)
+    try:
+        after = max(0, int(request.GET.get("after", 0)))
+    except ValueError:
+        after = 0
+    other_id = o.creator_id if me.pk == o.brand_id else o.brand_id
+    recent = list(o.messages.order_by("-id")[:60])[::-1]
+    if any(not m.read and m.sender_id != me.pk for m in recent):
+        o.messages.filter(read=False).exclude(sender=me).update(read=True)
+    new = [m for m in recent if m.id > after]
+    return JsonResponse({
+        "ok": True, "status": o.status, "last": recent[-1].id if recent else 0, "since": recent[0].id if recent else 0,
+        "messages": [{"id": m.id, "mine": m.sender_id == me.pk, "body": m.body, "time": _clock(m.created),
+                      "day": _day_label(m.created), "read": m.read or m.sender_id != me.pk, "heart": m.heart} for m in new],
+        "read": [m.id for m in recent if m.sender_id == me.pk and m.read],
+        "hearts": [m.id for m in recent if m.heart],
+        "typing": cache.get(f"typing:{o.pk}:{other_id}") is not None,
+    })
+
+
+@login_required
+@require_POST
+@throttle("typing", limit=400, window=600)
+def offer_typing(request, pk):
+    o = _offer_or_404(request, pk)
+    cache.set(f"typing:{o.pk}:{request.user.pk}", 1, 6)
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+@throttle("heart", limit=300, window=600)
+def message_heart(request, pk, mid):
+    o = _offer_or_404(request, pk)
+    m = get_object_or_404(Message, pk=mid, offer=o)
+    if m.sender_id == request.user.pk:
+        return JsonResponse({"ok": False, "error": "You can only heart messages you receive."}, status=400)
+    m.heart = not m.heart
+    m.save(update_fields=["heart"])
+    return JsonResponse({"ok": True, "heart": m.heart})
+
+
+def _inbox_items(user, f=""):
+    """Chats for the list: (offer, the other person, unread count, preview text)."""
+    qs = Offer.objects.filter(Q(brand=user) | Q(creator=user)).select_related("brand__profile", "creator__profile")
     if f == "pending":
         qs = qs.filter(status=Offer.PENDING)
     elif f == "active":
         qs = qs.filter(status=Offer.ACCEPTED)
     elif f == "closed":
         qs = qs.filter(status__in=[Offer.DECLINED, Offer.WITHDRAWN, Offer.COMPLETED])
-    else:
-        f = ""
     offers = list(qs[:100])
-    unread = dict(Message.objects.filter(offer__in=offers, read=False).exclude(sender=u)
+    unread = dict(Message.objects.filter(offer__in=offers, read=False).exclude(sender=user)
                   .values_list("offer").annotate(c=Count("id")))
     last = {}
-    for m in Message.objects.filter(offer__in=offers).order_by("created").values("offer_id", "body", "sender_id"):
-        last[m["offer_id"]] = ("You: " if m["sender_id"] == u.pk else "") + m["body"]
-    items = [(o, (o.creator if o.brand_id == u.pk else o.brand).profile, unread.get(o.pk, 0), last.get(o.pk) or o.message)
-             for o in offers]
-    return render(request, "core/inbox.html", {"items": items, "f": f})
+    for m in Message.objects.filter(offer__in=offers).order_by("id").values("offer_id", "body", "sender_id"):
+        last[m["offer_id"]] = ("You: " if m["sender_id"] == user.pk else "") + m["body"]
+    return [(o, (o.creator if o.brand_id == user.pk else o.brand).profile, unread.get(o.pk, 0), last.get(o.pk) or o.message)
+            for o in offers]
+
+
+@never_cache
+@login_required
+def inbox(request):
+    f = request.GET.get("s", "")
+    f = f if f in ("pending", "active", "closed") else ""
+    cur = request.GET.get("cur", "")
+    ctx = {"items": _inbox_items(request.user, f), "f": f, "current": int(cur) if cur.isdigit() else 0}
+    if request.GET.get("partial"):  # only the rows, for the live refresh
+        return render(request, "core/_threads.html", ctx)
+    return render(request, "core/inbox.html", ctx)
 
 
 def robots(request):
@@ -759,3 +868,160 @@ def unread_count(request):
     resp = JsonResponse({"count": inbox_total(request.user)})
     resp["Cache-Control"] = "no-store"
     return resp
+
+
+# ---------- consent, legal pages ----------
+@login_required
+def accept_terms(request):
+    nxt = request.GET.get("next") or request.POST.get("next") or "/"
+    if not url_has_allowed_host_and_scheme(nxt, allowed_hosts={request.get_host()}):
+        nxt = "/"
+    form = TermsForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        Profile.objects.filter(pk=request.user.profile.pk).update(
+            terms_version=settings.TERMS_VERSION, terms_accepted_at=timezone.now(), adult_confirmed=True)
+        request.session["terms_v"] = settings.TERMS_VERSION
+        messages.success(request, "Thanks! You're all set.")
+        return redirect(nxt)
+    return render(request, "core/accept_terms.html", {"form": form, "next": nxt})
+
+
+def terms(request):
+    return render(request, "core/terms.html")
+
+
+def privacy(request):
+    return render(request, "core/privacy.html")
+
+
+def guidelines(request):
+    return render(request, "core/guidelines.html")
+
+
+def grievance(request):
+    return render(request, "core/grievance.html")
+
+
+# ---------- fun: streak, kudos ----------
+@login_required
+@require_POST
+def checkin(request):
+    p = request.user.profile
+    before = p.checkin_xp
+    if p.check_in():
+        p.save()
+        n = p.streak
+        line = ("Day 1. Every legend starts somewhere (usually in pyjamas)." if n == 1 else
+                "3 days in a row! Your mom would be proud." if n == 3 else
+                "A whole week! Sharma ji's son is taking notes." if n == 7 else
+                f"Day {n}. Your kite is flying high.")
+        messages.success(request, f"{line} +{p.checkin_xp - before} XP")
+    else:
+        messages.info(request, "Already flown your kite today. Come back tomorrow, don't be greedy.")
+    return redirect(_back(request, reverse("home")))
+
+
+@login_required
+@require_POST
+@throttle("kudos", limit=120, window=3600)
+def kudos_toggle(request, handle):
+    target = get_object_or_404(Profile, handle=handle.lower())
+    live = request.headers.get("X-Kyto") in ("chat", "json")
+    if target.user_id == request.user.pk:
+        if live:
+            return JsonResponse({"ok": False, "error": "You can't give yourself kudos. Nice try though."}, status=400)
+        messages.info(request, "You can't give yourself kudos. Nice try though.")
+        return redirect(_back(request, reverse("home")))
+    obj, created = Kudos.objects.get_or_create(user=request.user, profile=target)
+    if not created:
+        obj.delete()
+    count = Kudos.objects.filter(profile=target).count()
+    Profile.objects.filter(pk=target.pk).update(kudos=count)
+    if live:
+        return JsonResponse({"ok": True, "on": created, "count": count})
+    return redirect(_back(request, reverse("creator", args=[target.handle])))
+
+
+# ---------- safety: report, export my data ----------
+@login_required
+@throttle("report", limit=10, window=86400)
+def report(request, kind, pk):
+    review = offer = None
+    if kind == "profile":
+        profile = get_object_or_404(Profile, pk=pk)
+        if profile.user_id == request.user.pk:
+            raise Http404
+        label, back = f"@{profile.handle}", reverse("creator", args=[profile.handle])
+    elif kind == "review":
+        review = get_object_or_404(Review.objects.select_related("author__profile"), pk=pk)
+        profile = review.author.profile
+        if profile.user_id == request.user.pk:
+            raise Http404
+        label, back = f"a review by @{profile.handle}", _back(request, reverse("home"))
+    elif kind == "offer":
+        offer = _offer_or_404(request, pk)
+        profile = (offer.creator if request.user.pk == offer.brand_id else offer.brand).profile
+        label, back = f"this chat with @{profile.handle}", reverse("offer", args=[offer.pk])
+    else:
+        raise Http404
+    form = ReportForm(request.POST or None)
+    if request.method == "POST" and form.is_valid():
+        Report.objects.create(reporter=request.user, profile=profile, review=review, offer=offer,
+                              reason=form.cleaned_data["reason"], details=form.cleaned_data["details"].strip())
+        messages.success(request, "Report sent. A real person will look at it, usually within a day. Thank you for keeping Kyto clean.")
+        return redirect(back)
+    return render(request, "core/report.html", {"form": form, "label": label, "back": back})
+
+
+@never_cache
+@login_required
+def export_data(request):
+    """Everything we hold about you, as a file (your right to access your data)."""
+    u, p = request.user, request.user.profile
+    offers = Offer.objects.filter(Q(brand=u) | Q(creator=u)).select_related("brand__profile", "creator__profile")
+    data = {
+        "exported_at": timezone.now().isoformat(),
+        "account": {"username": u.username, "email": u.email, "joined": u.date_joined.isoformat()},
+        "profile": {
+            "role": p.role, "name": p.display_name, "handle": p.handle, "niche": p.niche, "city": p.city,
+            "address": p.address, "about": p.bio, "followers": p.followers, "engagement_percent": float(p.engagement),
+            "price_per_post": p.rate_per_post, "whatsapp": p.whatsapp, "show_whatsapp_to_members": p.show_contact,
+            "score": p.rank_score, "verified": p.verified, "kudos": p.kudos, "streak": p.streak,
+            "accepted_terms_version": p.terms_version,
+            "accepted_terms_at": p.terms_accepted_at.isoformat() if p.terms_accepted_at else None,
+        },
+        "reels": [s.url for s in p.showcase.all()],
+        "offers": [{
+            "title": o.title, "budget": o.budget, "status": o.status, "started_by": o.initiator,
+            "brand": o.brand.profile.handle, "creator": o.creator.profile.handle, "message": o.message,
+            "created": o.created.isoformat(),
+            "chat": [{"from": m.sender.profile.handle, "text": m.body, "at": m.created.isoformat()}
+                     for m in o.messages.select_related("sender__profile")],
+        } for o in offers],
+        "reviews_written": [{"about": r.subject.profile.handle, "rating": r.rating, "comment": r.comment}
+                            for r in Review.objects.filter(author=u).select_related("subject__profile")],
+        "reviews_received": [{"from": r.author.profile.handle, "rating": r.rating, "comment": r.comment}
+                             for r in Review.objects.filter(subject=u).select_related("author__profile")],
+        "kudos_given_to": list(Kudos.objects.filter(user=u).values_list("profile__handle", flat=True)),
+    }
+    resp = JsonResponse(data, json_dumps_params={"indent": 2, "ensure_ascii": False})
+    resp["Content-Disposition"] = 'attachment; filename="kyto-my-data.json"'
+    return resp
+
+
+# ---------- Kyto Plus: coming-soon page and waiting list (nothing is sold) ----------
+@login_required
+def plus(request):
+    return render(request, "core/plus.html", {"interested": PlusInterest.objects.filter(user=request.user).exists()})
+
+
+@login_required
+@require_POST
+def plus_toggle(request):
+    obj, created = PlusInterest.objects.get_or_create(user=request.user)
+    if created:
+        messages.success(request, "You're on the list. We'll tell you before anything changes, and nothing is charged.")
+    else:
+        obj.delete()
+        messages.info(request, "Removed from the list. No hard feelings.")
+    return redirect("plus")

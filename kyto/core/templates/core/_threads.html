@@ -1,0 +1,15 @@
+{% load core_extras %}{% for o, other, unread, preview in items %}
+<a class="thread{% if unread %} unread{% endif %}{% if o.pk == current %} active{% endif %}" href="{% url 'offer' o.pk %}"{% if o.pk == current %} aria-current="page"{% endif %}>
+  <span class="ring ring-s{% if other.is_brand %} brand{% endif %}{% if other.verified %} vr{% endif %}" aria-hidden="true"><span class="avatar {{ other.avatar_class }}">{{ other.initial }}</span></span>
+  <span class="thread-main">
+    <span class="thread-top"><b>{{ other.display_name }}</b><time class="muted">{{ o.updated|timesince }}</time></span>
+    <span class="thread-title">{{ o.title }} · {{ o.budget|rupees }}</span>
+    <span class="thread-prev muted">{{ preview|truncatechars:60 }}</span>
+  </span>
+  <span class="thread-end">{% if unread %}<span class="badge-n">{{ unread }}</span>{% endif %}<span class="pill pill-{{ o.status }}">{{ o.get_status_display }}</span></span>
+</a>
+{% empty %}
+<div class="empty"><h3>Crickets. Even your spam folder is jealous.</h3>
+  <p>{% if user.profile.role == "brand" %}Find a creator and send your first offer.{% else %}When a brand sends you an offer, it shows up here. Add your best reels to get noticed.{% endif %}</p>
+  <a class="btn btn-primary" href="{% if user.profile.role == 'brand' %}{% url 'leaderboard' %}{% else %}{% url 'settings' %}#showcase{% endif %}">{% if user.profile.role == "brand" %}Find creators{% else %}Add my reels{% endif %}</a></div>
+{% endfor %}

@@ -40,6 +40,17 @@ if not DEBUG and (len(SECRET_KEY) < 50 or SECRET_KEY.startswith(_BAD_KEYS)):
 SITE_NAME = os.environ.get("SITE_NAME", "Kyto")
 TAGLINE = "Rise with every post."
 ZYRAC_URL = "https://www.instagram.com/zyrac__/"
+
+# Legal details shown on the Terms, Privacy and Grievance pages. Fill these in .env before you go live.
+TERMS_VERSION = "2026-11-06"          # change this date whenever you change the Terms or Privacy Policy: everyone re-accepts
+LEGAL_ENTITY = os.environ.get("LEGAL_ENTITY", "")
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
+GRIEVANCE_NAME = os.environ.get("GRIEVANCE_NAME", "")
+GRIEVANCE_EMAIL = os.environ.get("GRIEVANCE_EMAIL", "")
+GRIEVANCE_PHONE = os.environ.get("GRIEVANCE_PHONE", "")
+GRIEVANCE_ADDRESS = os.environ.get("GRIEVANCE_ADDRESS", "")
+# Paid plans ("Kyto Plus") are NOT live. Keep False until payments, GST and refund terms are set up properly.
+PLUS_ENABLED = os.environ.get("PLUS_ENABLED", "False").lower() == "true"
 # Paid boosting is switched off while the platform is free. Flip to True later to bring it back.
 BOOST_ENABLED = os.environ.get("BOOST_ENABLED", "False").lower() == "true"
 # How many reverse proxies sit in front of the app (0 in Codespaces/dev, usually 1 on Render/Railway/Nginx).
@@ -80,6 +91,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "core.middleware.LoginRequired",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
@@ -102,7 +114,7 @@ TEMPLATES = [
     }
 ]
 
-DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3"}}
+DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3", "OPTIONS": {"timeout": 20}}}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -119,7 +131,7 @@ USE_TZ = True
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
-STATIC_URL = "/static/"
+STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 try:  # keeps WhiteNoise quiet in development; collectstatic fills it for production
     STATIC_ROOT.mkdir(exist_ok=True)

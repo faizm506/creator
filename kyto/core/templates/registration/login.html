@@ -1,16 +1,23 @@
 {% extends "core/base.html" %}
 {% block title %}Sign in · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<section class="wrap auth">
-  <h1>Welcome back</h1>
-  <p class="lead-s">Sign in with your Instagram handle.</p>
-  <form method="post" class="group">
-    {% csrf_token %}
-    <input type="hidden" name="next" value="{{ next }}">
-    {% if form.errors %}<p class="notice err-box">Nope. That handle and password aren't on speaking terms. Try again.</p>{% endif %}
-    {% for field in form %}{% include "core/_field.html" %}{% endfor %}
-    <button class="btn btn-primary btn-block">Sign in</button>
-  </form>
-  <p class="fine"><a href="{% url 'password_reset' %}">Forgot your password?</a> · New here? <a href="{% url 'signup' %}">Join free</a></p>
+<section class="wrap authx">
+  {% include "core/_auth_stage.html" %}
+  <div class="authx-card">
+    <h1>Welcome back</h1>
+    <p class="lead-s">Sign in to see creators, campaigns and your chats.</p>
+    <form method="post" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ next }}">
+      {% if form.errors %}<p class="notice err-box" role="alert">Nope. That handle and password aren't on speaking terms. Try again.</p>{% endif %}
+      {% for field in form %}{% include "core/_field.html" %}{% endfor %}
+      <label class="check"><input type="checkbox" name="remember" checked><span>Keep me signed in on this device</span></label>
+      <button class="btn btn-primary btn-block btn-lg">Sign in</button>
+    </form>
+    <p class="fine center"><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
+    <div class="or"><span>New to {{ SITE_NAME }}?</span></div>
+    <a class="btn btn-ghost btn-block btn-lg" href="{% url 'signup' %}">Create a free account</a>
+    <p class="legal-line">By continuing you agree to our <a href="{% url 'terms' %}">Terms</a> and <a href="{% url 'privacy' %}">Privacy Policy</a>.</p>
+  </div>
 </section>
 {% endblock %}

@@ -1,56 +1,112 @@
 {% extends "core/base.html" %}
 {% block title %}About · {{ SITE_NAME }}{% endblock %}
 {% block content %}
-<section class="wrap about-hero">
+<section class="wrap ab-hero">
   <p class="eyebrow">About {{ SITE_NAME }}</p>
   <h1>Good work should get found.</h1>
-  <p class="lead-l">Ahmedabad has thousands of talented Instagram creators, and thousands of businesses that want to work with them. They just can't find each other easily. {{ SITE_NAME }} is one simple place where they meet.</p>
+  <p class="lead-l">Ahmedabad has thousands of talented Instagram creators, and thousands of businesses that want to work with them. They just can't find each other easily. {{ SITE_NAME }} is one simple place where they meet, agree on the work and get it done.</p>
+  <div class="ab-cta">
+    {% if user.is_authenticated %}<a class="btn btn-primary btn-lg" href="{% url 'home' %}">Back to {{ SITE_NAME }}</a>
+    {% else %}<a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join free</a><a class="btn btn-ghost btn-lg" href="{% url 'login' %}">Sign in</a>{% endif %}
+  </div>
 </section>
 
-<section class="wrap about-scene">{% include "core/_scene.html" %}</section>
-
-<section class="wrap why">
-  <div class="why-card"><h3>Why we made it</h3><p>Creators were sending hundreds of messages hoping a brand would reply. Brands were searching through endless profiles with no idea who was real. Both lose time. We wanted a calm, fair place where good creators rise by their work.</p></div>
-  <div class="why-card"><h3>What makes it different</h3><p>Everyone is ranked by the same public score. No one can pay to rank higher. Phone numbers stay private until both sides agree to work together.</p></div>
+<section class="wrap ab-sec">
+  <div class="ab-two">
+    <div class="ab-card"><h3>The problem</h3><p>Creators send hundreds of messages hoping a brand will reply. Brands scroll through endless profiles with no idea who is real, what they charge or whether they'll turn up. Both sides lose time, and good people get missed.</p></div>
+    <div class="ab-card"><h3>What we built</h3><p>A calm, fair place with a public leaderboard, honest reviews and direct chat. Creators rise by their work, brands by how they treat creators, and nobody can pay to rank higher.</p></div>
+  </div>
 </section>
 
-<section class="wrap how-sec" data-tabs>
+<section class="wrap ab-sec">
+  <h2>Everything in one place</h2>
+  <p class="lead-s">No extra apps. No agency in the middle.</p>
+  <div class="feat-grid">
+    <div class="feat"><span class="feat-ic"><svg viewBox="0 0 24 24"><path d="M5 20V12M12 20V4M19 20v-9"/></svg></span><b>Leaderboard</b><p>A public score out of 100. See who's rising in your city and niche.</p></div>
+    <div class="feat"><span class="feat-ic">{% include "core/_kmark.html" with big=1 %}</span><b>Kite Mark</b><p>Our verified badge. It means we checked the profile or shop is real.</p></div>
+    <div class="feat"><span class="feat-ic"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a1 1 0 011-1h4a1 1 0 011 1v2"/></svg></span><b>Campaigns</b><p>Brands post work with a budget. Creators reply with their own price.</p></div>
+    <div class="feat"><span class="feat-ic"><svg viewBox="0 0 24 24"><path d="M21 3L3 10.5l7 2.5 2.5 7z"/></svg></span><b>Direct offers</b><p>Hire a creator, or pitch a brand, straight from their profile.</p></div>
+    <div class="feat"><span class="feat-ic"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H8l-4 4z"/></svg></span><b>Live chat</b><p>Talk inside the offer. Messages arrive without refreshing the page.</p></div>
+    <div class="feat"><span class="feat-ic"><svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.6 6 .8-4.4 4.2 1.1 6L12 16.7 6.7 19.6l1.1-6L3.4 9.4l6-.8z"/></svg></span><b>Honest reviews</b><p>Only after a job is finished, so every review is real. They move the ranking.</p></div>
+    <div class="feat"><span class="feat-ic"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M10 9l5 3-5 3z"/></svg></span><b>Reels and shop pages</b><p>Creators show their best reels. Brands show shop photos and a map.</p></div>
+    <div class="feat"><span class="feat-ic"><svg viewBox="0 0 24 24"><path d="M12 2c1 4 5 6 5 11a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 0-4-1-6 1-10z"/></svg></span><b>Streaks and levels</b><p>A little daily fun. Fly your kite, climb from Chai Tapri Regular to Kyto Legend.</p></div>
+    <div class="feat"><span class="feat-ic"><svg viewBox="0 0 24 24"><path d="M12 21s-8-5.2-8-11a4.5 4.5 0 0 1 8-2.8A4.5 4.5 0 0 1 20 10c0 5.8-8 11-8 11z"/></svg></span><b>Kudos</b><p>Give someone a heart. It's just for fun, so it never changes the ranking.</p></div>
+  </div>
+</section>
+
+<section class="wrap ab-sec" data-tabs>
   <h2>How it works</h2>
   <div class="seg" role="tablist" aria-label="Choose who you are">
     <button type="button" role="tab" class="on" data-tab="creator" aria-selected="true">I'm a creator</button>
     <button type="button" role="tab" data-tab="brand" aria-selected="false">I'm a brand</button>
   </div>
   <ol class="steps steps-3" data-panel="creator">
-    <li><span class="num">1</span><h3>Join and fill your page</h3><p>Add your name, city, niche and followers. Add three of your best reels.</p></li>
+    <li><span class="num">1</span><h3>Join and fill your page</h3><p>Add your name, city, niche and followers, then three of your best reels.</p></li>
     <li><span class="num">2</span><h3>See where you rank</h3><p>You get a score out of 100 and a place on the city leaderboard.</p></li>
-    <li><span class="num">3</span><h3>Get offers and chat</h3><p>Brands send offers to you. Say yes or no, chat, and agree the work.</p></li>
+    <li><span class="num">3</span><h3>Get offers and chat</h3><p>Brands send offers. Say yes or no, chat, agree the work and get paid directly.</p></li>
   </ol>
   <ol class="steps steps-3" data-panel="brand" hidden>
-    <li><span class="num">1</span><h3>Join as a brand</h3><p>Create a free account with your brand name. No setup cost.</p></li>
-    <li><span class="num">2</span><h3>Find the right creator</h3><p>Filter by niche and city. Watch their reels right on their page.</p></li>
-    <li><span class="num">3</span><h3>Send an offer</h3><p>Tell them what you need and your budget. When they accept, you can chat and share contacts.</p></li>
+    <li><span class="num">1</span><h3>Join as a brand</h3><p>Create a free account, add your shop photos and address.</p></li>
+    <li><span class="num">2</span><h3>Find the right creator</h3><p>Filter by niche and city. Watch their reels on their page.</p></li>
+    <li><span class="num">3</span><h3>Send an offer or post a campaign</h3><p>Tell them what you need and your budget. When they accept, you can chat and share contacts.</p></li>
   </ol>
 </section>
 
-<section class="wrap tips-sec">
-  <h2>Tips to get the best from it</h2>
-  <div class="tips">
-    <div><b>Add three reels</b><p>Brands trust what they can see. Pages with reels get noticed first.</p></div>
-    <div><b>Be honest with numbers</b><p>Real numbers build trust. Brands check the reels anyway.</p></div>
-    <div><b>Reply within a day</b><p>Quick replies win work. A short "I'm interested" is enough to start.</p></div>
-    <div><b>Keep it in the chat</b><p>Agree the work in the offer chat first. Share your phone number only when you're comfortable.</p></div>
+<section class="wrap ab-sec">
+  <h2>How ranking works</h2>
+  <p class="lead-s">One public score. The same rules for everyone.</p>
+  <div class="ab-two">
+    <div class="ab-card"><h3>Creators</h3>
+      <ul class="bars">
+        <li><span>Audience size</span><progress max="100" value="30"></progress><b>30</b></li>
+        <li><span>Engagement</span><progress max="100" value="20"></progress><b>20</b></li>
+        <li><span>Complete profile</span><progress max="100" value="20"></progress><b>20</b></li>
+        <li><span>Brand reviews</span><progress max="100" value="15"></progress><b>15</b></li>
+        <li><span>Reel showcase</span><progress max="100" value="10"></progress><b>10</b></li>
+        <li><span>Kite Mark</span><progress max="100" value="5"></progress><b>5</b></li>
+      </ul></div>
+    <div class="ab-card"><h3>Brands</h3>
+      <ul class="bars">
+        <li><span>Creator reviews</span><progress max="100" value="40"></progress><b>40</b></li>
+        <li><span>Complete shop page</span><progress max="100" value="25"></progress><b>25</b></li>
+        <li><span>Kite Mark</span><progress max="100" value="20"></progress><b>20</b></li>
+        <li><span>Finished deals</span><progress max="100" value="15"></progress><b>15</b></li>
+      </ul></div>
   </div>
+  <p class="ab-more"><a href="{% url 'how' %}">Read the full ranking rules</a></p>
 </section>
 
-<section class="wrap faq">
+<section class="wrap ab-sec">
+  <h2>Your privacy and safety</h2>
+  <p class="lead-s">Built to be safe first.</p>
+  <div class="trust-grid">
+    <div><b>Members only</b><p>Everything is behind sign-in, like Instagram. Nothing is open to the public web.</p></div>
+    <div><b>Adults only</b><p>You confirm you are 18 or older when you join.</p></div>
+    <div><b>Your number stays private</b><p>WhatsApp is shared only with a person whose offer you accept.</p></div>
+    <div><b>We never touch your money</b><p>You agree payment directly. We never ask for OTPs, UPI PINs or cards.</p></div>
+    <div><b>Report anything</b><p>Every profile, review and chat has a Report button. A real person reads it.</p></div>
+    <div><b>Your data, your call</b><p>Download everything we hold, or delete your account, any time.</p></div>
+  </div>
+  <p class="ab-links"><a href="{% url 'terms' %}">Terms of Use</a><a href="{% url 'privacy' %}">Privacy Policy</a><a href="{% url 'guidelines' %}">Community Guidelines</a><a href="{% url 'grievance' %}">Grievance Officer</a></p>
+</section>
+
+<section class="wrap ab-sec">
+  <h2>Built in Ahmedabad</h2>
+  <p class="lead-s">Tap a landmark to meet the city's creators.</p>
+  <div class="about-scene">{% include "core/_scene.html" %}</div>
+</section>
+
+<section class="wrap faq ab-sec">
   <h2>Quick answers</h2>
-  <details><summary>Is it really free?</summary><p>Yes. Joining, ranking, showing reels and receiving offers cost nothing right now. We'll always tell you well before that changes.</p></details>
+  <details><summary>Is it really free?</summary><p>Yes. Joining, ranking, showing reels and getting offers cost nothing right now. We'll always tell you well before that changes.</p></details>
+  <details><summary>Who can see my profile?</summary><p>Only people who are signed in to {{ SITE_NAME }}. Your email is never shown to anyone.</p></details>
   <details><summary>Who can see my phone number?</summary><p>Nobody, unless you choose. It is shared with a brand only after you accept their offer.</p></details>
-  <details><summary>How is my rank decided?</summary><p>By a public score from your audience, engagement, a complete page and your reels. <a href="{% url 'how' %}">See the full rules.</a></p></details>
+  <details><summary>How is my rank decided?</summary><p>By a public score from your audience, engagement, a complete page, reviews and reels. Money never changes your rank.</p></details>
   <details><summary>Do I pay through {{ SITE_NAME }}?</summary><p>No. You and the brand agree payment between yourselves. We never ask for money, cards or UPI PINs.</p></details>
+  <details><summary>What if someone behaves badly?</summary><p>Press Report on their profile, review or chat. We review it, usually within a day, and can remove content or suspend accounts.</p></details>
 </section>
 
-<section class="wrap memes">
+<section class="wrap memes ab-sec">
   <h2>Meme corner</h2>
   <p class="lead-s">We built this on real problems.</p>
   <div class="meme-grid">
@@ -59,16 +115,11 @@
   </div>
 </section>
 
-<section class="wrap maker">
+<section class="wrap ab-sec">
   <a class="maker-card" href="{{ ZYRAC_URL }}" target="_blank" rel="noopener noreferrer" aria-label="Made by Zyrac. Opens Zyrac on Instagram in a new tab.">
     <span class="maker-z" aria-hidden="true">Z</span>
     <span class="maker-text"><small>Designed &amp; built by</small><b>Zyrac</b><span>from Ahmedabad, with love for local talent</span></span>
     <span class="maker-go">@zyrac__ <i aria-hidden="true">›</i></span>
   </a>
-</section>
-
-<section class="wrap launch-band">
-  <div><h2>Ready to start?</h2><p class="lead-s">It takes about five minutes and it's free.</p></div>
-  <a class="btn btn-primary btn-lg" href="{% url 'signup' %}">Join free</a>
 </section>
 {% endblock %}

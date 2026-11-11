@@ -1,102 +1,109 @@
 {% extends "core/base.html" %}
 {% load core_extras %}
 {% block title %}{{ o.title }} · {{ SITE_NAME }}{% endblock %}
+{% block bodyclass %} chat-page{% endblock %}
 {% block content %}
-<section class="wrap deal">
-  <p class="back"><a href="{% url 'inbox' %}">‹ Inbox</a></p>
-  <div class="deal-grid">
+<section class="dm" data-dm>
+  <aside class="dm-list" aria-label="Your chats">
+    <div class="dm-head"><h2>Messages</h2></div>
+    <div class="threads" data-region="threads" data-src="{% url 'inbox' %}?partial=1&amp;cur={{ o.pk }}">{% include "core/_threads.html" %}</div>
+  </aside>
 
-    <aside class="deal-side" data-side>
-      <section class="panel who-card">
-        <span class="avatar avatar-lg {{ other.avatar_class }}" aria-hidden="true">{{ other.initial }}</span>
-        <div>
-          <p class="muted">{% if is_init %}Your {% if o.initiator == "creator" %}proposal to{% else %}offer to{% endif %}{% else %}{% if o.initiator == "creator" %}Proposal from{% else %}Offer from{% endif %}{% endif %}</p>
-          <h1><a href="{% url 'creator' other.handle %}">{{ other.display_name }}</a></h1>
-        </div>
-        <span class="pill pill-{{ o.status }}">{{ o.get_status_display }}</span>
-      </section>
+  <div class="chatbox" data-status="{{ o.status }}" data-offer="{{ o.pk }}" data-last="{{ last_id }}"
+       data-poll="{% url 'offer_poll' o.pk %}" data-typing="{% url 'offer_typing' o.pk %}"
+       data-hearts="{% url 'offer' o.pk %}heart/" data-other="{{ other.display_name }}">
+    <header class="chat-head">
+      <a class="back-btn" href="{% url 'inbox' %}" aria-label="Back to messages">‹</a>
+      <a class="ring ring-s{% if other.is_brand %} brand{% endif %}{% if other.verified %} vr{% endif %}" href="{% url 'creator' other.handle %}" aria-hidden="true" tabindex="-1"><span class="avatar {{ other.avatar_class }}">{{ other.initial }}</span></a>
+      <div class="chat-who"><a href="{% url 'creator' other.handle %}"><b>{{ other.display_name }}{% if other.verified %}{% include "core/_kmark.html" %}{% endif %}</b></a><span class="muted">@{{ other.handle }} · {{ o.title|truncatechars:30 }}</span></div>
+      <span class="pill pill-{{ o.status }}">{{ o.get_status_display }}</span>
+      <button type="button" class="icon-btn" data-toggle-details aria-label="Offer details"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button>
+    </header>
 
-      <section class="panel">
-        <h2 class="deal-title">{{ o.title }}</h2>
-        <p class="big-budget">{{ o.budget|rupees }}</p>
-        <div class="tags">{% for d in o.deliverables|chips %}<span class="tag tag-big">{{ d }}</span>{% empty %}<span class="muted">{{ o.deliverables }}</span>{% endfor %}</div>
-        {% if o.campaign %}<p class="fine">For campaign: <a href="{% url 'campaign' o.campaign.pk %}">{{ o.campaign.title }}</a></p>{% endif %}
-        {% if o.status == "pending" and is_init %}<p class="fine wait-joke">Now we wait. Brands and creators love to "circle back".</p>{% endif %}
-        <ol class="track" aria-label="Progress">
-          <li class="done">Sent</li>
-          <li class="{% if o.status == 'accepted' or o.status == 'completed' %}done{% elif o.status == 'declined' or o.status == 'withdrawn' %}fail{% endif %}">{% if o.status == 'declined' %}Declined{% elif o.status == 'withdrawn' %}Withdrawn{% else %}Accepted{% endif %}</li>
-          <li class="{% if o.status == 'completed' %}done{% endif %}">Done</li>
-        </ol>
-      </section>
-
-      {% if o.status == 'pending' and not is_init %}
-      <section class="decide">
-        <h3>{% if is_brand %}Accept this proposal?{% else %}Do you want this job?{% endif %}</h3>
-        <p>If you accept, you and {{ other.display_name }} can see each other's WhatsApp number{% if not user.profile.whatsapp %}. You haven't added yours yet, so <a href="{% url 'settings' %}#profile">add it first</a>{% endif %}. You can chat before deciding.</p>
-        <div class="decide-btns">
-          <form method="post" action="{% url 'offer_action' o.pk 'accept' %}">{% csrf_token %}<button class="btn btn-primary btn-lg">Accept</button></form>
-          <form method="post" action="{% url 'offer_action' o.pk 'decline' %}" data-confirm="Decline this offer?">{% csrf_token %}<button class="btn btn-ghost btn-lg">Not now</button></form>
-        </div>
-      </section>
-      {% endif %}
-
-      {% if reveal %}
-      <section class="reveal"><div><b>{{ other.display_name }}'s WhatsApp</b><span>{{ other.whatsapp }}</span></div>
-        <a class="btn btn-primary" href="https://wa.me/{{ other.whatsapp|cut:'+' }}" target="_blank" rel="noopener noreferrer">Open</a></section>
-      {% elif o.status == 'accepted' %}<p class="notice">{{ other.display_name }} hasn't added a WhatsApp number yet. Keep chatting here.</p>{% endif %}
-
-      <div class="side-acts">
-        {% if o.status == 'pending' and is_init %}<form method="post" action="{% url 'offer_action' o.pk 'withdraw' %}" data-confirm="Withdraw this?">{% csrf_token %}<button class="btn btn-quiet">Withdraw</button></form>{% endif %}
-        {% if o.status == 'accepted' %}<form method="post" action="{% url 'offer_action' o.pk 'complete' %}" data-confirm="Mark this work as finished?">{% csrf_token %}<button class="btn btn-ghost btn-block">Mark work as finished</button></form>{% endif %}
-      </div>
-    </aside>
-
-    <div class="chatbox" data-status="{{ o.status }}" data-offer="{{ o.pk }}">
-      <header class="chat-head">
-        <span class="ring ring-s{% if other.is_brand %} brand{% endif %}{% if other.verified %} vr{% endif %}" aria-hidden="true"><span class="avatar {{ other.avatar_class }}">{{ other.initial }}</span></span>
-        <div><b>{{ other.display_name }}</b><span class="muted">@{{ other.handle }}</span></div>
-      </header>
-      <div class="chat" data-chat aria-live="polite">
-        {% for m in thread %}
-        {% ifchanged m.at|date:"Y-m-d" %}<div class="day">{{ m.at|date:"j F" }}</div>{% endifchanged %}
-        <div class="bubble {% if m.mine %}me{% else %}them{% endif %}" data-id="{{ m.id }}">
-          {% if m.first %}<small class="tagline">{% if o.initiator == "creator" %}Original proposal{% else %}Original offer{% endif %}</small>{% endif %}
-          <p>{{ m.body|linebreaksbr }}</p><time>{{ m.at|date:"g:i a" }}</time>
-        </div>
-        {% endfor %}
-        <span id="end"></span>
-      </div>
-
-      {% if o.is_open %}
-      <div class="quick" aria-label="Quick replies">
-        {% if o.status == 'pending' %}
-          {% if is_init %}<button type="button" class="chip" data-quick="Thanks for looking at this! Happy to answer any questions.">Happy to answer questions</button>
-          {% else %}<button type="button" class="chip" data-quick="Thanks, I'm interested! Can you share more details?">I'm interested</button><button type="button" class="chip" data-quick="What is the timeline for this?">What's the timeline?</button><button type="button" class="chip" data-quick="Could we talk about the budget?">Talk about budget</button>{% endif %}
-        {% else %}
-          <button type="button" class="chip" data-quick="Sounds good!">Sounds good!</button><button type="button" class="chip" data-quick="When would you like to start?">When do we start?</button><button type="button" class="chip" data-quick="Thank you!">Thank you!</button>
-        {% endif %}
-      </div>
-      <form method="post" action="{% url 'message_send' o.pk %}" class="composer">
-        {% csrf_token %}
-        <textarea name="body" rows="1" maxlength="1000" placeholder="Write a message" aria-label="Message" required data-grow></textarea>
-        <button class="send" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></button>
-      </form>
-      {% else %}<p class="chat-closed">This offer is closed, so the chat is read-only.</p>{% endif %}
+    {% if o.status == 'pending' and not is_init %}
+    <div class="decide-bar">
+      <div><b>{% if is_brand %}Accept this proposal?{% else %}Do you want this job?{% endif %}</b>
+        <span>{{ o.budget|rupees }} · accepting shares your WhatsApp with {{ other.display_name }}.{% if not user.profile.whatsapp %} <a href="{% url 'settings' %}#profile">Add yours first.</a>{% endif %}</span></div>
+      <form method="post" action="{% url 'offer_action' o.pk 'accept' %}">{% csrf_token %}<button class="btn btn-primary">Accept</button></form>
+      <form method="post" action="{% url 'offer_action' o.pk 'decline' %}" data-confirm="Decline this offer?">{% csrf_token %}<button class="btn btn-ghost">Not now</button></form>
     </div>
-  </div>
-  {% if o.status == 'completed' %}
-  <section class="panel review-card" id="review">
-    <h2>How was it working with {{ other.display_name }}?</h2>
-    {% if their_review %}<p class="fine fine-top">{{ other.display_name }} rated you <span class="stars">{{ their_review.rating|stars }}</span>.</p>{% endif %}
-    {% if my_review %}
-    <p class="notice done-note">Your review: <span class="stars">{{ my_review.rating|stars }}</span>{% if my_review.comment %} “{{ my_review.comment }}”{% endif %}</p>
-    <details class="edit-review"><summary>Change my review</summary>{% include "core/_review_form.html" with label="Update review" %}</details>
-    {% else %}
-    <p class="fine fine-top">Your honest review helps others and moves {{ other.display_name }} up or down the leaderboard.</p>
-    {% include "core/_review_form.html" with label="Post review" %}
+    {% elif o.status == 'pending' and is_init %}
+    <p class="wait-bar">Waiting for {{ other.display_name }} to reply. Brands and creators love to "circle back".</p>
     {% endif %}
-  </section>
-  {% endif %}
-  <p class="fine center">Agree payment directly with each other. {{ SITE_NAME }} never asks you to pay.</p>
+
+    <div class="chat" data-chat aria-live="polite">
+      {% for m in thread %}
+      {% ifchanged m.day %}<div class="day">{{ m.day }}</div>{% endifchanged %}
+      <div class="bubble {% if m.mine %}me{% else %}them{% endif %}{% if m.heart %} hearted{% endif %}" data-id="{{ m.id }}" data-read="{% if m.read %}1{% else %}0{% endif %}">
+        {% if m.first %}<small class="tagline">{% if o.initiator == "creator" %}Original proposal{% else %}Original offer{% endif %}</small>{% endif %}
+        <p>{{ m.body }}</p><time>{{ m.time }}</time>
+        {% if not m.mine and not m.first %}<button type="button" class="heart-btn" data-heart aria-label="Heart this message">♥</button>{% endif %}
+        <span class="heart-mark" aria-hidden="true">♥</span>
+      </div>
+      {% endfor %}
+      <span id="end"></span>
+    </div>
+    <div class="typing-note" data-typing-note hidden><span></span></div>
+    <button type="button" class="jump" data-jump hidden>New message ↓</button>
+
+    {% if o.is_open %}
+    <div class="quick" aria-label="Quick replies">
+      {% if o.status == 'pending' %}
+        {% if is_init %}<button type="button" class="chip" data-quick="Thanks for looking at this! Happy to answer any questions.">Happy to answer questions</button>
+        {% else %}<button type="button" class="chip" data-quick="Thanks, I'm interested! Can you share more details?">I'm interested</button><button type="button" class="chip" data-quick="What is the timeline for this?">What's the timeline?</button><button type="button" class="chip" data-quick="Could we talk about the budget?">Talk about budget</button>{% endif %}
+      {% else %}
+        <button type="button" class="chip" data-quick="Sounds good!">Sounds good!</button><button type="button" class="chip" data-quick="When would you like to start?">When do we start?</button><button type="button" class="chip" data-quick="Thank you!">Thank you!</button>
+      {% endif %}
+    </div>
+    <form method="post" action="{% url 'message_send' o.pk %}" class="composer" autocomplete="off">
+      {% csrf_token %}
+      <textarea name="body" rows="1" maxlength="1000" placeholder="Message…" aria-label="Message" required data-grow></textarea>
+      <span class="cc" hidden></span>
+      <button class="send" aria-label="Send message"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19V5M5.5 11.5L12 5l6.5 6.5"/></svg></button>
+    </form>
+    {% else %}<p class="chat-closed">This offer is closed, so the chat is read-only.</p>{% endif %}
+  </div>
+
+  <aside class="deal-side" data-side aria-label="Offer details">
+    <div class="side-top"><h2>Details</h2><button type="button" class="icon-btn" data-toggle-details aria-label="Close details">✕</button></div>
+    <section class="panel">
+      <h3 class="deal-title">{{ o.title }}</h3>
+      <p class="big-budget">{{ o.budget|rupees }}</p>
+      <div class="tags">{% for d in o.deliverables|chips %}<span class="tag tag-big">{{ d }}</span>{% empty %}<span class="muted">{{ o.deliverables }}</span>{% endfor %}</div>
+      {% if o.campaign %}<p class="fine">For campaign: <a href="{% url 'campaign' o.campaign.pk %}">{{ o.campaign.title }}</a></p>{% endif %}
+      <ol class="track" aria-label="Progress">
+        <li class="done">Sent</li>
+        <li class="{% if o.status == 'accepted' or o.status == 'completed' %}done{% elif o.status == 'declined' or o.status == 'withdrawn' %}fail{% endif %}">{% if o.status == 'declined' %}Declined{% elif o.status == 'withdrawn' %}Withdrawn{% else %}Accepted{% endif %}</li>
+        <li class="{% if o.status == 'completed' %}done{% endif %}">Done</li>
+      </ol>
+    </section>
+
+    {% if reveal %}
+    <section class="reveal"><div><b>{{ other.display_name }}'s WhatsApp</b><span>{{ other.whatsapp }}</span></div>
+      <a class="btn btn-primary" href="https://wa.me/{{ other.whatsapp|cut:'+' }}" target="_blank" rel="noopener noreferrer">Open</a></section>
+    {% elif o.status == 'accepted' %}<p class="notice">{{ other.display_name }} hasn't added a WhatsApp number yet. Keep chatting here.</p>{% endif %}
+
+    <div class="side-acts">
+      {% if o.status == 'pending' and is_init %}<form method="post" action="{% url 'offer_action' o.pk 'withdraw' %}" data-confirm="Withdraw this?">{% csrf_token %}<button class="btn btn-quiet">Withdraw</button></form>{% endif %}
+      {% if o.status == 'accepted' %}<form method="post" action="{% url 'offer_action' o.pk 'complete' %}" data-confirm="Mark this work as finished?">{% csrf_token %}<button class="btn btn-ghost btn-block">Mark work as finished</button></form>{% endif %}
+    </div>
+
+    {% if o.status == 'completed' %}
+    <section class="panel review-card" id="review">
+      <h3>How was it working with {{ other.display_name }}?</h3>
+      {% if their_review %}<p class="fine fine-top">{{ other.display_name }} rated you <span class="stars">{{ their_review.rating|stars }}</span>.</p>{% endif %}
+      {% if my_review %}
+      <p class="notice done-note">Your review: <span class="stars">{{ my_review.rating|stars }}</span>{% if my_review.comment %} “{{ my_review.comment }}”{% endif %}</p>
+      <details class="edit-review"><summary>Change my review</summary>{% include "core/_review_form.html" with label="Update review" %}</details>
+      {% else %}
+      <p class="fine fine-top">Your honest review helps others and moves {{ other.display_name }} up or down the leaderboard.</p>
+      {% include "core/_review_form.html" with label="Post review" %}
+      {% endif %}
+    </section>
+    {% endif %}
+
+    <p class="fine">Paid collaboration? Indian advertising rules say the post must be labelled (use Instagram's "Paid partnership" label or #ad). Agree payment directly. {{ SITE_NAME }} never asks you to pay.</p>
+    <p class="fine"><a class="menu-danger" href="{% url 'report' 'offer' o.pk %}">Report this chat</a></p>
+  </aside>
 </section>
 {% endblock %}

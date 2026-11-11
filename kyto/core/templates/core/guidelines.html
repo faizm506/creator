@@ -1,0 +1,34 @@
+{% extends "core/base.html" %}
+{% block title %}Community Guidelines · {{ SITE_NAME }}{% endblock %}
+{% block content %}
+<article class="wrap legal">
+  <p class="eyebrow">Be good. Be real.</p>
+  <h1>Community Guidelines</h1>
+  <p class="lead-s">{{ SITE_NAME }} works because people trust each other. Here is what keeps it that way.</p>
+
+  <h2>Do</h2>
+  <ul class="legal-do">
+    <li>Use your real details, real numbers and real reels.</li>
+    <li>Say clearly when a post is paid. Use Instagram's <b>Paid partnership</b> label or <b>#ad</b>. Indian advertising and consumer rules require it.</li>
+    <li>Reply to offers politely, even if the answer is no. Ghosting is not a personality.</li>
+    <li>Agree price and work in writing inside the chat.</li>
+    <li>Leave honest reviews after a finished job.</li>
+  </ul>
+
+  <h2>Don't</h2>
+  <ul class="legal-dont">
+    <li>Don't fake followers, engagement or reviews, or pay for reviews.</li>
+    <li>Don't impersonate anyone or copy someone else's work or photos.</li>
+    <li>Don't harass, threaten, shame or discriminate against anyone.</li>
+    <li>Don't post anything illegal, hateful, sexual or violent, or anything involving a person under 18.</li>
+    <li>Don't send spam, scams or asks for money to "unlock" a deal. Never share OTPs, UPI PINs or card details.</li>
+    <li>Don't scrape the site or try to break it.</li>
+  </ul>
+
+  <h2>See something wrong?</h2>
+  <p>Use the <b>Report</b> button on any profile, review or chat. A real person looks at every report, usually within a day. Serious complaints are handled by our <a href="{% url 'grievance' %}">Grievance Officer</a>.</p>
+
+  <h2>What happens if rules are broken</h2>
+  <p>We may remove content, lower or reset a ranking, warn, or suspend an account. For anything illegal we may inform the authorities. You can ask us to reconsider through the Grievance Officer.</p>
+</article>
+{% endblock %}
