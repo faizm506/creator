@@ -1,4 +1,5 @@
 import io
+import logging
 from functools import wraps
 from urllib.parse import quote
 
@@ -11,6 +12,10 @@ from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.utils.safestring import mark_safe
+
+
+sec_log = logging.getLogger("kyto.security")
+REGISTRY = {"login": (8, 900), "poll": (90, 60)}  # every rate limit in one place (the audit command reads this)
 
 
 def client_ip(request):
@@ -35,12 +40,15 @@ def hit(key, window):
 
 def throttle(name, limit, window=900):
     """Limit POST requests per IP (and per user when signed in)."""
+    REGISTRY[name] = (limit, window)
+
     def deco(view):
         @wraps(view)
         def wrapper(request, *args, **kwargs):
             if request.method == "POST":
                 who = request.user.pk if request.user.is_authenticated else client_ip(request)
                 if hit(f"thr:{name}:{who}", window) > limit:
+                    sec_log.warning("rate_limited name=%s who=%s path=%s", name, who, request.path)
                     if request.headers.get("X-Kyto") in ("chat", "json"):
                         return JsonResponse({"ok": False, "error": "Slow down a little. Try again in a few minutes."}, status=429)
                     messages.error(request, "Too many attempts. Please wait a few minutes and try again.")

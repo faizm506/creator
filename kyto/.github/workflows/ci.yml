@@ -1,0 +1,38 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+    env:
+      DEBUG: "False"
+      SECRET_KEY: ci-only-secret-key-that-is-long-enough-for-the-django-deploy-checks-0123456789
+      ALLOWED_HOSTS: localhost
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: pip install -r requirements-prod.txt coverage pip-audit
+      - name: Production settings pass Django's deployment checklist
+        run: python manage.py check --deploy --fail-level WARNING
+      - name: Migrations are committed (no model change without a migration)
+        run: python manage.py makemigrations --check --dry-run
+      - name: JavaScript parses
+        run: node --check core/static/core/js/app.js
+      - name: Tests with coverage
+        run: |
+          coverage run manage.py test
+          coverage report
+      - name: Known-vulnerability scan of dependencies
+        run: pip-audit -r requirements.txt
+        continue-on-error: true

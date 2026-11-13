@@ -1,9 +1,13 @@
+import re
+import uuid
 from urllib.parse import quote
 
 from django.conf import settings
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
+
+from .logging_utils import request_id_var
 
 CSP = (
     "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; "
@@ -20,6 +24,7 @@ class SecurityHeaders:
 
     def __call__(self, request):
         resp = self.get_response(request)
+        resp.headers.setdefault("X-Frame-Options", "DENY")  # redirects from the login wall never reach Django's own middleware for this
         resp.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()")
         in_admin = request.path.startswith("/" + settings.ADMIN_URL)
         debug_page = settings.DEBUG and resp.status_code in (404, 500)  # Django's debug pages use inline styles
@@ -32,9 +37,9 @@ class SecurityHeaders:
         return resp
 
 
-PUBLIC = ("/login/", "/signup/", "/forgot-password/", "/reset/", "/about/", "/how-it-works/", "/privacy/", "/terms/",
+PUBLIC = ("/healthz/", "/readyz/", "/login/", "/signup/", "/forgot-password/", "/reset/", "/about/", "/how-it-works/", "/privacy/", "/terms/",
           "/guidelines/", "/grievance/", "/robots.txt", "/humans.txt", "/static/", "/.well-known/")
-TERMS_EXEMPT = ("/accept-terms/", "/logout/", "/privacy/", "/terms/", "/guidelines/", "/grievance/", "/about/",
+TERMS_EXEMPT = ("/healthz/", "/readyz/", "/accept-terms/", "/logout/", "/privacy/", "/terms/", "/guidelines/", "/grievance/", "/about/",
                 "/how-it-works/", "/account/delete/", "/account/export/", "/static/", "/robots.txt", "/humans.txt", "/api/")
 
 
@@ -63,3 +68,21 @@ class LoginRequired:
             else:
                 return redirect(reverse("accept_terms") + "?next=" + quote(request.get_full_path()))
         return self.get_response(request)
+
+
+class RequestId:
+    """Gives every request a short reference (also sent back as X-Request-ID) that shows up in the logs and on error pages."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        rid = re.sub(r"[^A-Za-z0-9-]", "", request.META.get("HTTP_X_REQUEST_ID", ""))[:40] or uuid.uuid4().hex[:12]
+        request.request_id = rid
+        token = request_id_var.set(rid)
+        try:
+            resp = self.get_response(request)
+        finally:
+            request_id_var.reset(token)
+        resp.headers["X-Request-ID"] = rid
+        return resp

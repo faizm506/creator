@@ -110,6 +110,13 @@ class ShowcaseTests(TestCase):
         c.get(reverse("creator", args=["other"]))
         c.get(reverse("creator", args=["other"]))
         self.assertEqual(Profile.objects.get(handle="other").views, 1)
+
+
+@override_settings(BOOST_ENABLED=True)
+class FairnessTests(TestCase):
+    def test_boost_is_switched_on_for_these_tests(self):
+        self.assertTrue(settings.BOOST_ENABLED)
+
     def _boosted(self, handle, **kw):
         kw.setdefault("bio", "x"); kw.setdefault("niche", "food"); kw.setdefault("followers", 5000)
         p = make(handle, **kw)
@@ -220,6 +227,12 @@ class LaunchModeTests(TestCase):
 class HardeningTests(TestCase):
     def setUp(self):
         cache.clear()
+
+    def test_clickjacking_header_is_on_redirects_too(self):
+        r = self.client.get(reverse("leaderboard"))  # a guest is redirected to sign in
+        self.assertEqual(r.status_code, 302)
+        self.assertEqual(r["X-Frame-Options"], "DENY")
+        self.assertIn("frame-ancestors 'none'", r["Content-Security-Policy"])
 
     def test_security_headers_present(self):
         r = self.client.get(reverse("home"))
@@ -900,6 +913,11 @@ class InstagramShellTests(TestCase):
         self.assertContains(page, "fcard theme-creator")
         self.assertContains(page, "fcard theme-brand")
 
+    def test_campaign_page_has_no_leftover_negative_offset(self):
+        css = (settings.BASE_DIR / "core/static/core/css/app.css").read_text()
+        last_rule = css.rsplit(".cdet{", 1)[1].split("}")[0]
+        self.assertNotIn("margin-top:-", last_rule)  # a negative margin would push the page title above the screen
+
     def test_nothing_pulses_or_shines(self):
         css = (settings.BASE_DIR / "core/static/core/css/app.css").read_text()
         self.assertIn("animation-iteration-count:1!important", css)
@@ -991,6 +1009,7 @@ class ChatEngineTests(TestCase):
         on = self.client.post(reverse("message_heart", args=[self.o.pk, m]), HTTP_X_KYTO="json").json()
         self.assertTrue(on["heart"])
         self.assertIn(m, self._poll(self.brand).json()["hearts"])
+        self._as(self.cr)  # the poll above signed in as the brand, so switch back to the person who hearted
         off = self.client.post(reverse("message_heart", args=[self.o.pk, m]), HTTP_X_KYTO="json").json()
         self.assertFalse(off["heart"])
 

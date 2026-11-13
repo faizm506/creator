@@ -64,5 +64,5 @@ attach a persistent disk, or move `MEDIA_ROOT` to object storage, before you go 
 ## Chat and many people at once
 - The open chat asks a tiny JSON address every 2.5 seconds while active (5 seconds idle, slower when the tab is hidden), not the whole page.
 - Every message carries an id made by the browser, so a retry or a double press can never post twice.
-- SQLite is switched to WAL mode with a 20 second wait, which copes with many readers and one writer. For a busy site use Postgres.
+- SQLite waits up to 20 seconds when busy. On a normal local disk you can add `SQLITE_WAL=1` for better read/write overlap; leave it off on network drives such as PythonAnywhere. For a busy site use Postgres.
 - "Typing…" is kept in memory, so run gunicorn with `--workers 1 --threads 8` (or add Redis later).

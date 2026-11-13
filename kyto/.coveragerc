@@ -1,0 +1,7 @@
+[run]
+source = core, config
+omit = */migrations/*, core/tests*.py, core/stack_checks.py
+
+[report]
+fail_under = 60
+show_missing = True

@@ -1314,3 +1314,10 @@ progress.xp{margin:10px 0 0;height:6px}
   .dm .deal-side{width:100%}
 }
 @media (min-width:821px){.chat-head .back-btn{display:none}}
+
+
+/* ----- campaign page: no leftover banner offset, calmer headings ----- */
+.cdet{margin-top:0;padding-top:24px}
+.panel>h2{font-size:20px;letter-spacing:-.01em;margin:0 0 10px}
+.panel-head h2{font-size:20px}
+@media (max-width:820px){.cdet{margin-top:0;padding-top:12px}}

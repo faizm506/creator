@@ -1,3 +1,4 @@
+import logging
 import math
 import os
 import re
@@ -17,6 +18,7 @@ from django.http import FileResponse, Http404, HttpResponse, HttpResponseRedirec
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
 from django.utils.formats import date_format
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.cache import never_cache
@@ -37,6 +39,10 @@ def not_found(request, exception):
 
 def _creators():
     return Profile.objects.filter(role=Profile.CREATOR).select_related("user")
+
+
+sec_log = logging.getLogger("kyto.security")
+app_log = logging.getLogger("kyto.app")
 
 
 def _back(request, default):
@@ -175,11 +181,13 @@ class LoginView(auth_views.LoginView):
             request.POST = data
         ip_key, user_key = self._keys()
         if cache.get(ip_key, 0) >= 15 or cache.get(user_key, 0) >= 8:
+            sec_log.warning("login_lockout ip=%s key=%s", ip_key, user_key)
             messages.error(request, "Too many wrong tries. For your safety, wait 15 minutes or reset your password.")
             return redirect("login")
         return super().post(request, *args, **kwargs)
 
     def form_invalid(self, form):
+        sec_log.info("login_failed ip=%s key=%s", *self._keys())
         for k in self._keys():
             hit(k, 900)
         return super().form_invalid(form)
@@ -968,6 +976,7 @@ def report(request, kind, pk):
     if request.method == "POST" and form.is_valid():
         Report.objects.create(reporter=request.user, profile=profile, review=review, offer=offer,
                               reason=form.cleaned_data["reason"], details=form.cleaned_data["details"].strip())
+        sec_log.info("report_created reporter=%s about=%s reason=%s", request.user.pk, profile.pk, form.cleaned_data["reason"])
         messages.success(request, "Report sent. A real person will look at it, usually within a day. Thank you for keeping Kyto clean.")
         return redirect(back)
     return render(request, "core/report.html", {"form": form, "label": label, "back": back})
@@ -1025,3 +1034,51 @@ def plus_toggle(request):
         obj.delete()
         messages.info(request, "Removed from the list. No hard feelings.")
     return redirect("plus")
+
+
+# ---------- monitoring and error pages ----------
+def healthz(request):
+    """Is the app running? Cheap, no database. Point an uptime monitor here."""
+    resp = JsonResponse({"status": "ok"})
+    resp["Cache-Control"] = "no-store"
+    return resp
+
+
+def readyz(request):
+    """Can the app do its job? Checks the database and the cache. 503 when something is down."""
+    checks = {}
+    try:
+        Profile.objects.only("id").first()
+        checks["database"] = "ok"
+    except Exception:
+        checks["database"] = "fail"
+        app_log.exception("readyz database check failed")
+    try:
+        cache.set("readyz", 1, 5)
+        checks["cache"] = "ok" if cache.get("readyz") == 1 else "fail"
+    except Exception:
+        checks["cache"] = "fail"
+        app_log.exception("readyz cache check failed")
+    ok = all(c == "ok" for c in checks.values())
+    resp = JsonResponse({"status": "ok" if ok else "degraded", "checks": checks, "version": settings.APP_VERSION},
+                        status=200 if ok else 503)
+    resp["Cache-Control"] = "no-store"
+    return resp
+
+
+_ERROR_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title}</title></head><body style="font-family:-apple-system,Segoe UI,sans-serif;text-align:center;padding:12vh 20px">
+<h1>{title}</h1><p>{body}</p><p><a href="/">Back to home</a></p>{ref}</body></html>"""
+
+
+def server_error(request, template_name="500.html"):
+    rid = escape(getattr(request, "request_id", "-"))
+    return HttpResponse(_ERROR_PAGE.format(
+        title="Something went wrong on our side.", body="We've been notified. Please try again in a minute.",
+        ref=f"<p>Reference: <code>{rid}</code><br>Quote this if you contact us.</p>"), status=500)
+
+
+def csrf_failure(request, reason=""):
+    sec_log.warning("csrf_failure path=%s reason=%s", request.path, reason)
+    return HttpResponse(_ERROR_PAGE.format(
+        title="Your session expired.", body="For your safety this page timed out. Go back, refresh it and try again.", ref=""), status=403)

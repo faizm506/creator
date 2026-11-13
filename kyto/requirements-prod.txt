@@ -1,0 +1,5 @@
+-r requirements.txt
+# Extras for a real server. All optional: the app runs without them.
+psycopg[binary]>=3.1      # Postgres, when you set DATABASE_URL
+redis>=5.0                # shared rate limits and typing status across workers, when you set REDIS_URL
+sentry-sdk>=2.0           # error tracking, when you set SENTRY_DSN

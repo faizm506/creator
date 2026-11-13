@@ -36,6 +36,8 @@ urlpatterns = [
         template_name="registration/reset_confirm.html", success_url=reverse_lazy("password_reset_complete")),
         name="password_reset_confirm"),
     path("api/unread/", views.unread_count, name="unread_count"),
+    path("healthz/", views.healthz, name="healthz"),
+    path("readyz/", views.readyz, name="readyz"),
     path("robots.txt", views.robots, name="robots"),
     path("humans.txt", views.humans, name="humans"),
     path("accept-terms/", views.accept_terms, name="accept_terms"),

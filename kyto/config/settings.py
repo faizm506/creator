@@ -3,6 +3,8 @@ import os
 import sys
 from pathlib import Path
 
+from config.dburl import parse_database_url
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -29,9 +31,14 @@ if not SECRET_KEY:
         raise RuntimeError("Set SECRET_KEY in the environment when DEBUG is False.")
 
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h.strip()]
+_render_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+if _render_host:
+    ALLOWED_HOSTS.append(_render_host)
 CSRF_TRUSTED_ORIGINS = [
     o.strip() for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "https://*.app.github.dev").split(",") if o.strip()
 ]
+if _render_host:
+    CSRF_TRUSTED_ORIGINS.append("https://" + _render_host)
 
 _BAD_KEYS = ("change-me", "dev-only", "your-secret", "django-insecure")
 if not DEBUG and (len(SECRET_KEY) < 50 or SECRET_KEY.startswith(_BAD_KEYS)):
@@ -82,6 +89,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "core.middleware.RequestId",
     "django.middleware.gzip.GZipMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "core.middleware.SecurityHeaders",
@@ -114,7 +122,17 @@ TEMPLATES = [
     }
 ]
 
-DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3", "OPTIONS": {"timeout": 20}}}
+# SQLite by default. On a host, set DATABASE_URL (for example Postgres) and nothing else changes.
+if os.environ.get("DATABASE_URL"):
+    DATABASES = {"default": parse_database_url(os.environ["DATABASE_URL"], BASE_DIR)}
+else:
+    DATABASES = {"default": {"ENGINE": "django.db.backends.sqlite3", "NAME": BASE_DIR / "db.sqlite3", "OPTIONS": {"timeout": 20}}}
+
+# Cache: in memory by default (one worker). Set REDIS_URL to share rate limits and typing status between workers.
+if os.environ.get("REDIS_URL"):
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.redis.RedisCache", "LOCATION": os.environ["REDIS_URL"]}}
+else:
+    CACHES = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}}
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
@@ -167,6 +185,10 @@ CSRF_COOKIE_SAMESITE = "Lax"
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
+SECURE_REDIRECT_EXEMPT = [r"^healthz/$", r"^readyz/$"]  # uptime checks may use plain http
+SILENCED_SYSTEM_CHECKS = ["security.W021"]  # HSTS preload is a deliberate choice: we do not submit the site to the preload list
+CSRF_FAILURE_VIEW = "core.views.csrf_failure"
+APP_VERSION = os.environ.get("APP_VERSION") or os.environ.get("RENDER_GIT_COMMIT", "dev")[:12]
 
 if not DEBUG and "test" not in sys.argv:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
@@ -176,3 +198,38 @@ if not DEBUG and "test" not in sys.argv:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = False
+
+
+# ---------------- logging, error tracking, alerts ----------------
+ADMINS = [("Kyto admin", e.strip()) for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()]
+SERVER_EMAIL = os.environ.get("SERVER_EMAIL", DEFAULT_FROM_EMAIL)  # 500 errors are emailed to ADMINS when this is set up
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {"()": "core.logging_utils.RequestIdFilter"},
+        "require_debug_false": {"()": "django.utils.log.RequireDebugFalse"},
+    },
+    "formatters": {"std": {"format": "[%(asctime)s] %(levelname)s %(name)s rid=%(request_id)s %(message)s"}},
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "std", "filters": ["request_id"]},
+        "mail_admins": {"class": "django.utils.log.AdminEmailHandler", "level": "ERROR",
+                        "filters": ["require_debug_false"], "include_html": False},
+    },
+    "loggers": {
+        "django.request": {"handlers": ["console", "mail_admins"], "level": "WARNING", "propagate": False},
+        "kyto.security": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "kyto.app": {"handlers": ["console"], "level": "INFO", "propagate": False},
+    },
+    "root": {"handlers": ["console"], "level": "WARNING"},
+}
+
+SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+if SENTRY_DSN:  # optional: pip install sentry-sdk. Errors then appear in Sentry with the request reference.
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.django import DjangoIntegration
+        sentry_sdk.init(dsn=SENTRY_DSN, integrations=[DjangoIntegration()], send_default_pii=False,
+                        traces_sample_rate=float(os.environ.get("SENTRY_TRACES", "0")), release=APP_VERSION)
+    except ImportError:
+        pass
